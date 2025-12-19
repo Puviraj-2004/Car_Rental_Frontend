@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useQuery, gql } from '@apollo/client';
+import { useQuery, gql } from '@apollo/client/react';
 import { useRouter } from 'next/navigation';
 import Typography from '@mui/material/Typography';
 import Card from '@mui/material/Card';
