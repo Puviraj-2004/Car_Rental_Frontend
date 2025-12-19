@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
-import { gql, useMutation } from '@apollo/client';
+import { gql, useMutation } from '@apollo/client/react';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Box from '@mui/material/Box';

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ApolloProvider } from '@apollo/client';
+import { ApolloProvider } from '@apollo/client/react';
 import client from '@/lib/apolloClient';
 import { ThemeProvider } from '@mui/material/styles';
 import theme from '@/lib/theme';
