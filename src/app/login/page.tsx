@@ -8,6 +8,7 @@ import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
+import Alert from '@mui/material/Alert';
 import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
@@ -27,6 +28,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   // Toggle password visibility
   const handleClickShowPassword = () => setShowPassword((show) => !show);
@@ -35,19 +37,40 @@ export default function LoginPage() {
   };
 
   // Handle Login Logic
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
 
-    // TODO: Connect with Backend / Apollo Client here
-    console.log('Logging in with:', { email, password });
+    try {
+      // TODO: Replace with actual backend API call
+      // For now using mock login
+      const mockUser = {
+        id: '1',
+        email: email,
+        firstName: 'John',
+        lastName: 'Doe',
+        role: email === 'admin@carrental.com' ? 'ADMIN' : 'USER',
+      };
 
-    // Simulating API call
-    setTimeout(() => {
+      const mockToken = 'mock_jwt_token_' + Date.now();
+
+      // Save to localStorage
+      localStorage.setItem('authToken', mockToken);
+      localStorage.setItem('userInfo', JSON.stringify(mockUser));
+
+      // Redirect based on role
+      if (mockUser.role === 'ADMIN') {
+        router.push('/admin');
+      } else {
+        router.push('/');
+      }
+    } catch (err) {
+      setError('Invalid email or password');
+      console.error('Login error:', err);
+    } finally {
       setLoading(false);
-      // Success - Redirect to Home
-      router.push('/');
-    }, 1500);
+    }
   };
 
   const handleSocialLogin = (provider: string) => {
@@ -75,6 +98,13 @@ export default function LoginPage() {
             backgroundColor: 'rgba(255, 255, 255, 0.95)',
           }}
         >
+          {/* Error Alert */}
+          {error && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {error}
+            </Alert>
+          )}
+
           {/* Header */}
           <Box sx={{ textAlign: 'center', mb: 4 }}>
             <Typography 
@@ -91,6 +121,9 @@ export default function LoginPage() {
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Please enter your details to sign in
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2, fontSize: '0.8rem' }}>
+              <strong>Demo:</strong> admin@carrental.com → Admin Panel | other emails → User Home
             </Typography>
           </Box>
 
