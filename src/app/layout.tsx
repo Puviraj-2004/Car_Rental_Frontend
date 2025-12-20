@@ -6,14 +6,11 @@ import client from '@/lib/apolloClient';
 import { ThemeProvider } from '@mui/material/styles';
 import theme from '@/lib/theme';
 import CssBaseline from '@mui/material/CssBaseline';
-import AppBar from '@mui/material/AppBar';
-import Toolbar from '@mui/material/Toolbar';
-import Typography from '@mui/material/Typography';
 import Container from '@mui/material/Container';
-import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import GDPRConsent from '@/components/GDPRConsent';
 import { getUserLanguage, setUserLanguage } from '@/lib/i18n';
+import Navbar from '@/components/navbar';
 
 export default function RootLayout({
   children,
@@ -46,29 +43,9 @@ export default function RootLayout({
         <ApolloProvider client={client}>
           <ThemeProvider theme={theme}>
             <CssBaseline />
-            <AppBar position="static">
-              <Toolbar>
-                <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-                  Car Rental Service
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Button 
-                    variant={language === 'en' ? 'contained' : 'outlined'} 
-                    size="small" 
-                    onClick={() => handleLanguageChange('en')}
-                  >
-                    EN
-                  </Button>
-                  <Button 
-                    variant={language === 'fr' ? 'contained' : 'outlined'} 
-                    size="small" 
-                    onClick={() => handleLanguageChange('fr')}
-                  >
-                    FR
-                  </Button>
-                </Box>
-              </Toolbar>
-            </AppBar>
+            <Navbar language={language} onLanguageChange={handleLanguageChange} />
+            {/* Spacer for fixed navbar */}
+            <Box sx={{ height: 80 }} />
             <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
               {children}
             </Container>
