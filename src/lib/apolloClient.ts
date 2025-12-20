@@ -17,7 +17,12 @@ const errorLink = onError(({ graphQLErrors, networkError }) => {
 // 1. இங்கு நாம் உருவாக்கிய Link chain-ஐ சரியாக அமைக்கிறோம்
 const link = from([
   errorLink,
-  new HttpLink({ uri: 'http://localhost:4000/graphql' }),
+  new HttpLink({
+    uri: 'http://localhost:4000/graphql',
+    fetchOptions: {
+      mode: 'cors',
+    },
+  }),
 ]);
 
 // 2. Client-ல் uri-க்கு பதிலாக நாம் மேலே உருவாக்கிய link-ஐ கொடுக்க வேண்டும்
