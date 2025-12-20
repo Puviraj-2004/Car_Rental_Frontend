@@ -1,4 +1,4 @@
-import { ApolloClient, InMemoryCache, HttpLink, from } from '@apollo/client/core';
+import { ApolloClient, InMemoryCache, HttpLink, from } from '@apollo/client'; // core-க்கு பதில் @apollo/client பயன்படுத்தவும்
 import { onError } from '@apollo/client/link/error';
 
 const errorLink = onError(({ graphQLErrors, networkError }) => {
@@ -14,13 +14,15 @@ const errorLink = onError(({ graphQLErrors, networkError }) => {
   }
 });
 
+// 1. இங்கு நாம் உருவாக்கிய Link chain-ஐ சரியாக அமைக்கிறோம்
 const link = from([
   errorLink,
   new HttpLink({ uri: 'http://localhost:4000/graphql' }),
 ]);
 
+// 2. Client-ல் uri-க்கு பதிலாக நாம் மேலே உருவாக்கிய link-ஐ கொடுக்க வேண்டும்
 const client = new ApolloClient({
-  uri: 'http://localhost:4000/graphql',
+  link: link, // <- மிக முக்கியமான மாற்றம் இதுதான்
   cache: new InMemoryCache(),
 });
 

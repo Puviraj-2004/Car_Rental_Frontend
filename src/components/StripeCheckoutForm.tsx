@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
-import { gql, useMutation } from '@apollo/client/react';
+import { useMutation } from '@apollo/client/react';
+import { gql } from '@apollo/client';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Box from '@mui/material/Box';
@@ -119,12 +120,7 @@ export default function StripeCheckoutForm({
       // Simulate successful payment
       const paymentResult = { error: null };
 
-      if (paymentResult.error) {
-        setError(paymentResult.error.message);
-      } else {
-        // Payment successful, redirect to success page
-        onSuccess(data.createBooking.id);
-      }
+
     } catch (err: any) {
       setError(err.message || getTranslation(language, 'errors.generic'));
     }

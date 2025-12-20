@@ -1,5 +1,17 @@
 export default {
   // Navigation
+  nav: {
+    home: 'Home',
+    about: 'About Us',
+    cars: 'Cars',
+    contact: 'Contact Us',
+    bookNow: 'Book Now',
+    profile: 'Profile',
+    myBookings: 'My Bookings',
+    settings: 'Settings',
+    logout: 'Logout',
+  },
+
   navigation: {
     home: 'Home',
     search: 'Search',
@@ -13,6 +25,16 @@ export default {
     title: 'Available Cars',
     searchPlaceholder: 'Search cars...',
     noCars: 'No cars available at the moment.',
+    loading: 'Loading...',
+    carsAvailable: 'cars available',
+  },
+
+  // Hero Section
+  hero: {
+    headline: 'Find Your Perfect Ride, Anytime',
+    subtitle: 'Affordable, reliable car rentals for every journey',
+    bookNow: 'Book Now',
+    viewCars: 'View Cars',
   },
 
   // Car Details

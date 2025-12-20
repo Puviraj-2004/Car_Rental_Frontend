@@ -1,5 +1,17 @@
 export default {
   // Navigation
+  nav: {
+    home: 'Accueil',
+    about: 'À propos',
+    cars: 'Voitures',
+    contact: 'Contact',
+    bookNow: 'Réserver',
+    profile: 'Profil',
+    myBookings: 'Mes réservations',
+    settings: 'Paramètres',
+    logout: 'Déconnexion',
+  },
+
   navigation: {
     home: 'Accueil',
     search: 'Recherche',
@@ -13,6 +25,16 @@ export default {
     title: 'Voitures disponibles',
     searchPlaceholder: 'Rechercher des voitures...',
     noCars: 'Aucune voiture disponible pour le moment.',
+    loading: 'Chargement...',
+    carsAvailable: 'voitures disponibles',
+  },
+
+  // Hero Section
+  hero: {
+    headline: 'Trouvez votre véhicule idéal, à tout moment',
+    subtitle: 'Location de voitures abordable et fiable pour chaque voyage',
+    bookNow: 'Réserver maintenant',
+    viewCars: 'Voir les voitures',
   },
 
   // Car Details
