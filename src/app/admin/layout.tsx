@@ -62,7 +62,7 @@ export default function AdminLayoutWrapper({ children }: { children: React.React
   const handleLogout = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('userInfo');
-    router.push('/login');
+    router.push('/');
   };
 
   const handleLangChange = (lang: string) => {

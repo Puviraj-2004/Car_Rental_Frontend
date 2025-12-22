@@ -12,6 +12,12 @@ const handler = NextAuth({
     signIn: '/auth/login',
   },
   callbacks: {
+    async signIn({ user, account, profile }) {
+      if (account?.provider === "google") {
+        return true;
+      }
+      return true;
+    },
     async session({ session, token }) {
       return session;
     },

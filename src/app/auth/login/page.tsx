@@ -1,288 +1,227 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Box from '@mui/material/Box';
-import Container from '@mui/material/Container';
-import Paper from '@mui/material/Paper';
-import Typography from '@mui/material/Typography';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
-import Alert from '@mui/material/Alert';
-import Divider from '@mui/material/Divider';
-import IconButton from '@mui/material/IconButton';
-import InputAdornment from '@mui/material/InputAdornment';
-import Link from '@mui/material/Link';
-import GoogleIcon from '@mui/icons-material/Google';
-import FacebookIcon from '@mui/icons-material/Facebook';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import EmailIcon from '@mui/icons-material/Email';
-import LockIcon from '@mui/icons-material/Lock';
-import { signIn } from "next-auth/react";
+import React, { useState, useEffect } from 'react';
+import { signIn } from 'next-auth/react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { 
+  Box, Container, Paper, Typography, TextField, 
+  Button, Alert, InputAdornment, Link, Divider, Snackbar, IconButton 
+} from '@mui/material';
+import { 
+  Email, Lock, Google, ArrowForward, 
+  Visibility, VisibilityOff, Close as CloseIcon 
+} from '@mui/icons-material';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   
-  // State for form fields
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  // URL-இல் வரும் எரர்களைப் பிடிக்க (உதாரணமாக Google Login தோல்வி)
+  const urlError = searchParams.get('error');
 
-  // Toggle password visibility
-  const handleClickShowPassword = () => setShowPassword((show) => !show);
-  const handleMouseDownPassword = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
+  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // 🚀 Pop-up (Snackbar) மற்றும் Error States
+  const [open, setOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  // URL-இல் ஏற்கனவே எரர் இருந்தால் அதை உடனே காட்ட
+  useEffect(() => {
+    if (urlError) {
+      setErrorMessage("Authentication failed. Please try again.");
+      setOpen(true);
+    }
+  }, [urlError]);
+
+  const handleClose = (event?: React.SyntheticEvent | Event, reason?: string) => {
+    if (reason === 'clickaway') return;
+    setOpen(false);
   };
 
-  // Handle Login Logic
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setErrorMessage(""); // பழைய எரரை நீக்க
+    setOpen(false);
 
     try {
-      // TODO: Replace with actual backend API call
-      // For now using mock login
-      const mockUser = {
-        id: '1',
-        email: email,
-        firstName: 'John',
-        lastName: 'Doe',
-        role: email === 'admin@carrental.com' ? 'ADMIN' : 'USER',
-      };
+      // 🚀 redirect: false மிக முக்கியம் - அப்போதுதான் எரர் இங்கேயே பிடிபடும்
+      const result = await signIn('credentials', {
+        email: formData.email,
+        password: formData.password,
+        redirect: false, 
+      });
 
-      const mockToken = 'mock_jwt_token_' + Date.now();
-
-      // Save to localStorage
-      localStorage.setItem('authToken', mockToken);
-      localStorage.setItem('userInfo', JSON.stringify(mockUser));
-
-      // Redirect based on role
-      if (mockUser.role === 'ADMIN') {
-        router.push('/admin');
-      } else {
-        router.push('/');
-      }
-    } catch (err) {
-      setError('Invalid email or password');
-      console.error('Login error:', err);
-    } finally {
       setLoading(false);
+
+      if (result?.error) {
+        // ❌ லாகின் தோல்வி
+        setErrorMessage(result.error || "Invalid email or password!");
+        setOpen(true); // Pop-up-ஐத் திறக்க
+      } else if (result?.ok) {
+        // ✅ லாகின் வெற்றி
+        router.push('/');
+        router.refresh(); 
+      }
+    } catch (err: any) {
+      setLoading(false);
+      setErrorMessage("An unexpected error occurred. Please try again.");
+      setOpen(true);
     }
   };
 
-  const handleSocialLogin = (provider: string) => {
-    console.log(`Login with ${provider}`);
-    // Social Login Logic here
-  };
-
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #F1F5F9 0%, #E2E8F0 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        py: 12, // Navbar spacer
+    <Box 
+      sx={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+        py: 4
       }}
     >
-      <Container maxWidth="sm">
-        <Paper
-          elevation={4}
-          sx={{
-            p: 4,
-            borderRadius: 3,
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      <Container maxWidth="xs">
+        <Paper 
+          elevation={10} 
+          sx={{ 
+            p: 4, 
+            borderRadius: 4,
+            position: 'relative'
           }}
         >
-          {/* Error Alert */}
-          {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
-              {error}
-            </Alert>
-          )}
-
-          {/* Header */}
-          <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <Typography 
-                variant="h4" 
-                component="h1" 
-                sx={{ 
-                    fontWeight: 700, 
-                    color: '#1E293B',
-                    mb: 1,
-                    fontFamily: 'Poppins, sans-serif'
-                }}
-            >
+          <Box sx={{ mb: 4, textAlign: 'center' }}>
+            <Typography variant="h4" fontWeight="800" color="#293D91" gutterBottom>
               Welcome Back
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Please enter your details to sign in
+              Login to your account to continue
             </Typography>
           </Box>
 
-          {/* Social Login Buttons */}
-          <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' }, mb: 3 }}>
-          <Button
-            fullWidth
-            variant="outlined"
-            startIcon={<GoogleIcon />}
-            // 🚀 இங்கேதான் மேஜிக் நடக்கிறது
-            onClick={() => signIn('google', { callbackUrl: '/' })} 
-            sx={{
-              borderColor: '#E2E8F0',
-              color: '#475569',
-              textTransform: 'none',
-              py: 1.5,
-              '&:hover': {
-                borderColor: '#CBD5E1',
-                backgroundColor: '#F8FAFC',
-              },
-            }}
-          >
-            Google
-          </Button>
-            <Button
+          {/* 🔍 Backup Alert: பாப்-அப் வரவில்லை என்றாலும் இது பட்டனுக்கு மேல் காட்டும் */}
+          {errorMessage && (
+            <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
+              {errorMessage}
+            </Alert>
+          )}
+
+          <form onSubmit={handleSubmit}>
+            {/* Email Input */}
+            <TextField
+              label="Email Address"
               fullWidth
-              variant="outlined"
-              startIcon={<FacebookIcon />}
-              onClick={() => handleSocialLogin('Facebook')}
-              sx={{
-                borderColor: '#E2E8F0',
-                color: '#1877F2',
-                textTransform: 'none',
-                py: 1.5,
-                '&:hover': {
-                  borderColor: '#CBD5E1',
-                  backgroundColor: '#F0F9FF',
-                },
+              required
+              sx={{ 
+                mb: 2,
+                "& input:-webkit-autofill": { WebkitBoxShadow: "0 0 0 1000px white inset" }
+              }}
+              value={formData.email}
+              autoComplete="new-password" 
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              InputProps={{ 
+                startAdornment: <InputAdornment position="start"><Email color="action" fontSize="small" /></InputAdornment> 
+              }}
+            />
+
+            {/* Password Input */}
+            <TextField
+              label="Password"
+              type={showPassword ? 'text' : 'password'}
+              fullWidth
+              required
+              sx={{ 
+                mb: 3,
+                "& input:-webkit-autofill": { WebkitBoxShadow: "0 0 0 1000px white inset" }
+              }}
+              value={formData.password}
+              autoComplete="new-password"
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              InputProps={{ 
+                startAdornment: <InputAdornment position="start"><Lock color="action" fontSize="small" /></InputAdornment>,
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                      {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                    </IconButton>
+                  </InputAdornment>
+                )
+              }}
+            />
+
+            <Button
+              type="submit"
+              variant="contained"
+              fullWidth
+              size="large"
+              disabled={loading}
+              endIcon={!loading && <ArrowForward />}
+              sx={{ 
+                bgcolor: '#293D91', 
+                py: 1.5, 
+                fontWeight: 'bold', 
+                borderRadius: 2,
+                '&:hover': { bgcolor: '#1a2a6b' } 
               }}
             >
-              Facebook
+              {loading ? 'Logging in...' : 'Login'}
             </Button>
-          </Box>
-
-          <Divider sx={{ my: 3, color: 'text.secondary', fontSize: '0.875rem' }}>
-            OR LOGIN WITH EMAIL
-          </Divider>
-
-          {/* Login Form */}
-          <form onSubmit={handleLogin}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-              
-              {/* Email Input */}
-              <TextField
-                label="Email Address"
-                variant="outlined"
-                fullWidth
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <EmailIcon color="action" />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-
-              {/* Password Input */}
-              <Box>
-                <TextField
-                    label="Password"
-                    variant="outlined"
-                    fullWidth
-                    required
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    InputProps={{
-                    startAdornment: (
-                        <InputAdornment position="start">
-                        <LockIcon color="action" />
-                        </InputAdornment>
-                    ),
-                    endAdornment: (
-                        <InputAdornment position="end">
-                        <IconButton
-                            aria-label="toggle password visibility"
-                            onClick={handleClickShowPassword}
-                            onMouseDown={handleMouseDownPassword}
-                            edge="end"
-                        >
-                            {showPassword ? <VisibilityOff /> : <Visibility />}
-                        </IconButton>
-                        </InputAdornment>
-                    ),
-                    }}
-                />
-                
-                {/* Forgot Password Link */}
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
-                    <Link 
-                        href="/forgot-password" 
-                        underline="hover" 
-                        sx={{ 
-                            fontSize: '0.875rem', 
-                            color: '#293D91', 
-                            fontWeight: 500,
-                            cursor: 'pointer'
-                        }}
-                    >
-                        Forgot Password?
-                    </Link>
-                </Box>
-              </Box>
-
-              {/* Submit Button */}
-              <Button
-                type="submit"
-                fullWidth
-                variant="contained"
-                size="large"
-                disabled={loading}
-                sx={{
-                  backgroundColor: '#293D91',
-                  py: 1.5,
-                  mt: 1,
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  '&:hover': {
-                    backgroundColor: '#1E293B',
-                  },
-                }}
-              >
-                {loading ? 'Signing in...' : 'Sign In'}
-              </Button>
-            </Box>
           </form>
 
-          {/* Footer - Sign Up Link */}
-          <Box sx={{ textAlign: 'center', mt: 4 }}>
+          <Divider sx={{ my: 4 }}>OR</Divider>
+
+          <Button
+            variant="outlined"
+            fullWidth
+            size="large"
+            startIcon={<Google sx={{ color: '#EA4335' }} />}
+            onClick={() => signIn('google', { callbackUrl: '/' })}
+            sx={{ 
+              py: 1.2, 
+              fontWeight: '600', 
+              borderRadius: 2, 
+              textTransform: 'none',
+              color: '#444', 
+              borderColor: '#ddd' 
+            }}
+          >
+            Sign in with Google
+          </Button>
+
+          <Box sx={{ mt: 4, textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary">
-              Don&apos;t have an account?{' '}
-              <Link 
-                href="/signup" 
-                underline="hover" 
-                sx={{ 
-                    color: '#293D91', 
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                }}
-              >
-                Sign Up
+              Don't have an account? {' '}
+              <Link href="/auth/signup" fontWeight="bold" color="#293D91" underline="hover">
+                Create Account
               </Link>
             </Typography>
           </Box>
         </Paper>
       </Container>
+
+      {/* 🚀 FIXED SNACKBAR POP-UP */}
+      <Snackbar 
+        open={open} 
+        autoHideDuration={6000} 
+        onClose={handleClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleClose} 
+          severity="error" 
+          variant="filled" 
+          elevation={6}
+          sx={{ width: '100%', fontWeight: '500' }}
+          action={
+            <IconButton size="small" color="inherit" onClick={handleClose}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          }
+        >
+          {errorMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

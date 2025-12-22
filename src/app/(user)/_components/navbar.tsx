@@ -1,20 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
-import AppBar from '@mui/material/AppBar';
-import Toolbar from '@mui/material/Toolbar';
-import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-import Box from '@mui/material/Box';
-import IconButton from '@mui/material/IconButton';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
-import Avatar from '@mui/material/Avatar';
+import { 
+  AppBar, Toolbar, Typography, Button, Box, IconButton, 
+  Menu, MenuItem, Avatar, Divider, Tooltip 
+} from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import DriveEtaIcon from '@mui/icons-material/DriveEta';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { useRouter, usePathname } from 'next/navigation';
 import { getTranslation } from '@/lib/i18n';
+import { useSession, signOut } from 'next-auth/react'; // 🚀 Next-Auth session இம்போர்ட்
 
 interface NavbarProps {
   language: string;
@@ -22,26 +17,16 @@ interface NavbarProps {
 }
 
 export default function Navbar({ language, onLanguageChange }: NavbarProps) {
+  const { data: session, status } = useSession(); // 🚀 செஷன் தகவல்கள்
   const [anchorElNav, setAnchorElNav] = useState<null | HTMLElement>(null);
   const [anchorElUser, setAnchorElUser] = useState<null | HTMLElement>(null);
   const router = useRouter();
   const pathname = usePathname();
 
-  const handleOpenNavMenu = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorElNav(event.currentTarget);
-  };
-
-  const handleOpenUserMenu = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorElUser(event.currentTarget);
-  };
-
-  const handleCloseNavMenu = () => {
-    setAnchorElNav(null);
-  };
-
-  const handleCloseUserMenu = () => {
-    setAnchorElUser(null);
-  };
+  const handleOpenNavMenu = (event: React.MouseEvent<HTMLElement>) => setAnchorElNav(event.currentTarget);
+  const handleOpenUserMenu = (event: React.MouseEvent<HTMLElement>) => setAnchorElUser(event.currentTarget);
+  const handleCloseNavMenu = () => setAnchorElNav(null);
+  const handleCloseUserMenu = () => setAnchorElUser(null);
 
   const handleNavClick = (path: string) => {
     router.push(path);
@@ -50,20 +35,13 @@ export default function Navbar({ language, onLanguageChange }: NavbarProps) {
 
   const navItems = [
     { label: getTranslation(language, 'nav.home'), path: '/' },
-    { label: getTranslation(language, 'nav.about'), path: '/about' },
     { label: getTranslation(language, 'nav.cars'), path: '/cars' },
+    { label: getTranslation(language, 'nav.about'), path: '/about' },
     { label: getTranslation(language, 'nav.contact'), path: '/contact' },
   ];
 
   return (
-    <AppBar
-      position="fixed"
-      sx={{
-        backgroundColor: '#0F172A',
-        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-        zIndex: 1100,
-      }}
-    >
+    <AppBar position="fixed" sx={{ backgroundColor: '#0F172A', zIndex: 1100 }}>
       <Box sx={{ width: '100%', maxWidth: 'xl', mx: 'auto', px: { xs: 2, sm: 3, md: 4 } }}>
         <Toolbar disableGutters>
           {/* Logo Section */}
@@ -74,100 +52,52 @@ export default function Navbar({ language, onLanguageChange }: NavbarProps) {
               noWrap
               component="a"
               href="/"
-              sx={{
-                mr: 2,
-                fontFamily: 'Poppins, Inter, sans-serif',
-                fontWeight: 700,
-                letterSpacing: '.1rem',
-                color: 'white',
-                textDecoration: 'none',
-                fontSize: '1.25rem',
-              }}
+              sx={{ fontFamily: 'Poppins', fontWeight: 700, color: 'white', textDecoration: 'none' }}
             >
               RentCar
             </Typography>
           </Box>
 
-          {/* Mobile Menu Button */}
+          {/* --- MOBILE VIEW TOGGLE --- */}
           <Box sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }}>
-            <IconButton
-              size="large"
-              aria-label="navigation menu"
-              aria-controls="menu-appbar"
-              aria-haspopup="true"
-              onClick={handleOpenNavMenu}
-              color="inherit"
-            >
+            <IconButton size="large" onClick={handleOpenNavMenu} color="inherit">
               <MenuIcon />
             </IconButton>
             <Menu
-              id="menu-appbar"
               anchorEl={anchorElNav}
-              anchorOrigin={{
-                vertical: 'bottom',
-                horizontal: 'left',
-              }}
-              keepMounted
-              transformOrigin={{
-                vertical: 'top',
-                horizontal: 'left',
-              }}
               open={Boolean(anchorElNav)}
               onClose={handleCloseNavMenu}
-              sx={{
-                display: { xs: 'block', md: 'none' },
-              }}
+              sx={{ display: { xs: 'block', md: 'none' } }}
             >
               {navItems.map((item) => (
                 <MenuItem key={item.label} onClick={() => handleNavClick(item.path)}>
                   <Typography textAlign="center">{item.label}</Typography>
                 </MenuItem>
               ))}
+              <Divider />
+              {/* மொபைல் மெனுவில் லாகின்/பயனர் ஆப்ஷன்கள் */}
+              {status !== 'authenticated' ? (
+                <MenuItem onClick={() => handleNavClick('/auth/login')}>
+                   <Typography color="primary">{getTranslation(language, 'login')}</Typography>
+                </MenuItem>
+              ) : (
+                <Box>
+                  <MenuItem onClick={() => handleNavClick('/profile')}>Profile</MenuItem>
+                  <MenuItem onClick={() => signOut()}>Logout</MenuItem>
+                </Box>
+              )}
             </Menu>
           </Box>
 
-          {/* Desktop Navigation */}
+          {/* --- DESKTOP NAVIGATION --- */}
           <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' }, justifyContent: 'center' }}>
             {navItems.map((item) => (
               <Button
                 key={item.label}
                 onClick={() => handleNavClick(item.path)}
                 sx={{
-                  my: 2,
-                  mx: 1,
-                  color: 'white',
-                  display: 'block',
-                  fontFamily: 'Inter, Poppins, sans-serif',
-                  fontSize: '0.95rem',
-                  fontWeight: 500,
-                  textTransform: 'none',
-                  position: 'relative',
-                  '&:hover': {
-                    backgroundColor: 'transparent',
-                    '&::after': {
-                      content: '""',
-                      position: 'absolute',
-                      bottom: 8,
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      width: '24px',
-                      height: '2px',
-                      backgroundColor: '#293D91',
-                      borderRadius: '1px',
-                    },
-                  },
-                  '&::after': {
-                    content: '""',
-                    position: 'absolute',
-                    bottom: 8,
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    width: pathname === item.path ? '24px' : '0px',
-                    height: '2px',
-                    backgroundColor: '#293D91',
-                    borderRadius: '1px',
-                    transition: 'width 0.3s ease',
-                  },
+                  my: 2, mx: 1, color: 'white', textTransform: 'none',
+                  borderBottom: pathname === item.path ? '2px solid #293D91' : 'none'
                 }}
               >
                 {item.label}
@@ -175,88 +105,46 @@ export default function Navbar({ language, onLanguageChange }: NavbarProps) {
             ))}
           </Box>
 
-          {/* Right Side Actions */}
+          {/* --- RIGHT SIDE ACTIONS --- */}
           <Box sx={{ flexGrow: 0, display: 'flex', alignItems: 'center', gap: 2 }}>
-
-            {/* Language Switcher */}
+            
+            {/* Language Switcher (Desktop Only) */}
             <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 0.5 }}>
-              <Button
-                variant={language === 'en' ? 'outlined' : 'text'}
-                size="small"
-                onClick={() => onLanguageChange('en')}
-                sx={{
-                  color: 'white',
-                  borderColor: language === 'en' ? '#293D91' : 'rgba(255, 255, 255, 0.3)',
-                  minWidth: '40px',
-                  fontSize: '0.8rem',
-                  '&:hover': {
-                    borderColor: '#293D91',
-                    backgroundColor: 'rgba(41, 61, 145, 0.1)',
-                  },
-                }}
-              >
-                EN
-              </Button>
-              <Button
-                variant={language === 'fr' ? 'outlined' : 'text'}
-                size="small"
-                onClick={() => onLanguageChange('fr')}
-                sx={{
-                  color: 'white',
-                  borderColor: language === 'fr' ? '#293D91' : 'rgba(255, 255, 255, 0.3)',
-                  minWidth: '40px',
-                  fontSize: '0.8rem',
-                  '&:hover': {
-                    borderColor: '#293D91',
-                    backgroundColor: 'rgba(41, 61, 145, 0.1)',
-                  },
-                }}
-              >
-                FR
-              </Button>
+              <Button size="small" sx={{ color: 'white' }} onClick={() => onLanguageChange('en')}>EN</Button>
+              <Button size="small" sx={{ color: 'white' }} onClick={() => onLanguageChange('fr')}>FR</Button>
             </Box>
 
-            {/* Login Button */}
-            <Button
-                variant="outlined"
-                onClick={() => router.push('/auth/login')}
-                sx={{
-                color: 'white',
-                borderColor: 'rgba(255,255,255,0.4)',
-                fontFamily: 'Inter, Poppins, sans-serif',
-                fontWeight: 500,
-                textTransform: 'none',
-                borderRadius: '8px',
-                px: 3,
-                '&:hover': {
-                    borderColor: '#293D91',
-                    backgroundColor: 'rgba(41,61,145,0.1)',
-                },
-                }}
-            >
-                {getTranslation(language, 'login')}
-            </Button>
-
-            {/* Sign Up Button */}
-            <Button
+            {/* 🚀 லாகின் செக் லாஜிக் */}
+            {status !== 'authenticated' ? (
+              // லாகின் செய்யாத போது மட்டும் லாகின் பட்டன்
+              <Button
                 variant="contained"
-                onClick={() => router.push('/signup')}
-                sx={{
-                backgroundColor: '#293D91',
-                color: 'white',
-                fontFamily: 'Inter, Poppins, sans-serif',
-                fontWeight: 600,
-                textTransform: 'none',
-                borderRadius: '8px',
-                px: 3,
-                '&:hover': {
-                    backgroundColor: '#1E293B',
-                    boxShadow: '0 4px 12px rgba(41, 61, 145, 0.4)',
-                },
-                }}
-            >
-                {getTranslation(language, 'signup')}
-            </Button>
+                onClick={() => router.push('/auth/login')}
+                sx={{ backgroundColor: '#293D91', color: 'white', borderRadius: '8px' }}
+              >
+                {getTranslation(language, 'login')}
+              </Button>
+            ) : (
+              // லாகின் செய்த பிறகு ப்ரொபைல் ஐகான் மட்டும்
+              <Box>
+                <Tooltip title="Open settings">
+                  <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
+                    <Avatar alt={session?.user?.name || 'User'} src={session?.user?.image || ''} sx={{ bgcolor: '#293D91' }} />
+                  </IconButton>
+                </Tooltip>
+                <Menu
+                  sx={{ mt: '45px' }}
+                  anchorEl={anchorElUser}
+                  open={Boolean(anchorElUser)}
+                  onClose={handleCloseUserMenu}
+                >
+                  <MenuItem onClick={() => handleNavClick('/profile')}>Profile</MenuItem>
+                  <MenuItem onClick={() => handleNavClick('/bookings')}>My Bookings</MenuItem>
+                  <Divider />
+                  <MenuItem onClick={() => signOut()}>Logout</MenuItem>
+                </Menu>
+              </Box>
+            )}
           </Box>
         </Toolbar>
       </Box>
