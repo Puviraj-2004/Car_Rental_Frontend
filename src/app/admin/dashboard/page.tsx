@@ -17,7 +17,7 @@ import {
   EventNote as BookingsIcon,
   Payment as PaymentIcon,
 } from '@mui/icons-material';
-import AdminLayout from '@/components/AdminLayout';
+
 
 interface DashboardCard {
   title: string;
@@ -89,8 +89,7 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <AdminLayout>
-      <Box>
+    <Box>
         {/* Header */}
         <Typography variant="h4" sx={{ mb: 1, fontWeight: 700, color: '#0F172A' }}>
           Dashboard
@@ -175,6 +174,5 @@ export default function AdminDashboard() {
           </Grid>
         </Grid>
       </Box>
-    </AdminLayout>
   );
 }

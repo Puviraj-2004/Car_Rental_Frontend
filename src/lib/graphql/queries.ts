@@ -1,8 +1,29 @@
 import { gql } from '@apollo/client';
 
+// 1. புதிய Enum Query (Add Car/Edit Car பக்கங்களுக்கு மிகவும் முக்கியம்)
+export const GET_CAR_ENUMS = gql`
+  query GetCarEnums {
+    fuelTypeEnum: __type(name: "FuelType") {
+      enumValues {
+        name
+      }
+    }
+    transmissionEnum: __type(name: "TransmissionType") {
+      enumValues {
+        name
+      }
+    }
+    critAirEnum: __type(name: "CritAirCategory") {
+      enumValues {
+        name
+      }
+    }
+  }
+`;
+
 export const GET_CARS_QUERY = gql`
-  query GetCars($filter: CarFilterInput) {
-    cars(filter: $filter) {
+  query GetCars {
+    cars {
       id
       brand
       model
@@ -10,25 +31,15 @@ export const GET_CARS_QUERY = gql`
       plateNumber
       fuelType
       transmission
-      seats
-      doors
-      pricePerHour
-      pricePerKm
+      pricePerHour    
+      pricePerKm      
       pricePerDay
-      critAirRating
+      critAirRating # இது இப்போது Enum ஆக வரும்
       availability
-      descriptionEn
-      descriptionFr
-      createdAt
-      updatedAt
-      images {
+      images {        
         id
-        carId
         imagePath
-        altText
         isPrimary
-        createdAt
-        updatedAt
       }
     }
   }
@@ -49,7 +60,7 @@ export const GET_CAR_QUERY = gql`
       pricePerHour
       pricePerKm
       pricePerDay
-      critAirRating
+      critAirRating # இது இப்போது Enum ஆக வரும்
       availability
       descriptionEn
       descriptionFr

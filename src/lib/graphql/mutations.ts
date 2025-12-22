@@ -81,3 +81,5 @@ export const SET_PRIMARY_CAR_IMAGE_MUTATION = gql`
     setPrimaryCarImage(carId: $carId, imageId: $imageId)
   }
 `;
+
+
