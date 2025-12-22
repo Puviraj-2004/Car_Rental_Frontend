@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { signIn } from 'next-auth/react';
+import { signIn, getSession } from 'next-auth/react'; // 🚀 ஒரே வரியில் இம்போர்ட்
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   Box, Container, Paper, Typography, TextField, 
@@ -12,22 +12,28 @@ import {
   Visibility, VisibilityOff, Close as CloseIcon 
 } from '@mui/icons-material';
 
+// 🛡️ TypeScript-க்கு Role இருப்பதை புரிய வைக்க
+interface CustomSession {
+  user?: {
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
+    role?: string; // 🚀 இதைக் கட்டாயம் சேர்க்க வேண்டும்
+  };
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
-  // URL-இல் வரும் எரர்களைப் பிடிக்க (உதாரணமாக Google Login தோல்வி)
   const urlError = searchParams.get('error');
 
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // 🚀 Pop-up (Snackbar) மற்றும் Error States
   const [open, setOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  // URL-இல் ஏற்கனவே எரர் இருந்தால் அதை உடனே காட்ட
   useEffect(() => {
     if (urlError) {
       setErrorMessage("Authentication failed. Please try again.");
@@ -43,31 +49,36 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setErrorMessage(""); // பழைய எரரை நீக்க
+    setErrorMessage("");
     setOpen(false);
 
     try {
-      // 🚀 redirect: false மிக முக்கியம் - அப்போதுதான் எரர் இங்கேயே பிடிபடும்
       const result = await signIn('credentials', {
         email: formData.email,
         password: formData.password,
         redirect: false, 
       });
 
-      setLoading(false);
-
       if (result?.error) {
-        // ❌ லாகின் தோல்வி
+        setLoading(false);
         setErrorMessage(result.error || "Invalid email or password!");
-        setOpen(true); // Pop-up-ஐத் திறக்க
+        setOpen(true);
       } else if (result?.ok) {
-        // ✅ லாகின் வெற்றி
-        router.push('/');
+        // 🚀 getSession-ஐ CustomSession ஆக மாற்றுகிறோம்
+        const session = await getSession() as CustomSession;
+        setLoading(false);
+
+        if (session?.user?.role === 'ADMIN') {
+          router.push('/admin/dashboard'); 
+        } else {
+          router.push('/');
+        }
+        
         router.refresh(); 
       }
     } catch (err: any) {
       setLoading(false);
-      setErrorMessage("An unexpected error occurred. Please try again.");
+      setErrorMessage("An unexpected error occurred.");
       setOpen(true);
     }
   };
@@ -100,7 +111,6 @@ export default function LoginPage() {
             </Typography>
           </Box>
 
-          {/* 🔍 Backup Alert: பாப்-அப் வரவில்லை என்றாலும் இது பட்டனுக்கு மேல் காட்டும் */}
           {errorMessage && (
             <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
               {errorMessage}
@@ -108,7 +118,6 @@ export default function LoginPage() {
           )}
 
           <form onSubmit={handleSubmit}>
-            {/* Email Input */}
             <TextField
               label="Email Address"
               fullWidth
@@ -125,7 +134,6 @@ export default function LoginPage() {
               }}
             />
 
-            {/* Password Input */}
             <TextField
               label="Password"
               type={showPassword ? 'text' : 'password'}
@@ -200,7 +208,6 @@ export default function LoginPage() {
         </Paper>
       </Container>
 
-      {/* 🚀 FIXED SNACKBAR POP-UP */}
       <Snackbar 
         open={open} 
         autoHideDuration={6000} 
