@@ -19,6 +19,7 @@ import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import EmailIcon from '@mui/icons-material/Email';
 import LockIcon from '@mui/icons-material/Lock';
+import { signIn } from "next-auth/react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -122,31 +123,29 @@ export default function LoginPage() {
             <Typography variant="body2" color="text.secondary">
               Please enter your details to sign in
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 2, fontSize: '0.8rem' }}>
-              <strong>Demo:</strong> admin@carrental.com → Admin Panel | other emails → User Home
-            </Typography>
           </Box>
 
           {/* Social Login Buttons */}
           <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' }, mb: 3 }}>
-            <Button
-              fullWidth
-              variant="outlined"
-              startIcon={<GoogleIcon />}
-              onClick={() => handleSocialLogin('Google')}
-              sx={{
-                borderColor: '#E2E8F0',
-                color: '#475569',
-                textTransform: 'none',
-                py: 1.5,
-                '&:hover': {
-                  borderColor: '#CBD5E1',
-                  backgroundColor: '#F8FAFC',
-                },
-              }}
-            >
-              Google
-            </Button>
+          <Button
+            fullWidth
+            variant="outlined"
+            startIcon={<GoogleIcon />}
+            // 🚀 இங்கேதான் மேஜிக் நடக்கிறது
+            onClick={() => signIn('google', { callbackUrl: '/' })} 
+            sx={{
+              borderColor: '#E2E8F0',
+              color: '#475569',
+              textTransform: 'none',
+              py: 1.5,
+              '&:hover': {
+                borderColor: '#CBD5E1',
+                backgroundColor: '#F8FAFC',
+              },
+            }}
+          >
+            Google
+          </Button>
             <Button
               fullWidth
               variant="outlined"

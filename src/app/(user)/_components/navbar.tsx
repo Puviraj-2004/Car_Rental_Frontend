@@ -219,7 +219,7 @@ export default function Navbar({ language, onLanguageChange }: NavbarProps) {
             {/* Login Button */}
             <Button
                 variant="outlined"
-                onClick={() => router.push('/login')}
+                onClick={() => router.push('/auth/login')}
                 sx={{
                 color: 'white',
                 borderColor: 'rgba(255,255,255,0.4)',
