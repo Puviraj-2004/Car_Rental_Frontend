@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { getSession } from 'next-auth/react';
+import { signOut } from 'next-auth/react';
 import {
   Box, AppBar, Toolbar, IconButton, useMediaQuery, useTheme,
   Typography, Avatar, Tooltip, Menu, MenuItem, Divider, Stack, Badge, Button
@@ -49,20 +51,39 @@ export default function AdminLayoutWrapper({ children }: { children: React.React
   const currentSidebarWidth = isMobile ? 0 : (collapsed ? collapsedWidth : drawerWidth);
 
   useEffect(() => {
-    const token = localStorage.getItem('authToken');
-    const userInfo = localStorage.getItem('userInfo');
-    if (!token) { router.push('/login'); return; }
-    if (userInfo) {
-      const user = JSON.parse(userInfo);
-      setUserName(`${user.firstName} ${user.lastName}`);
-      if (user.role !== 'ADMIN') router.push('/');
-    }
+    const checkAuth = async () => {
+      try {
+        const session = await getSession();
+        if (!session) {
+          router.push('/auth/login');
+          return;
+        }
+        
+        // Check if user has admin role
+        const userRole = (session.user as any)?.role;
+        if (userRole !== 'ADMIN') {
+          router.push('/');
+          return;
+        }
+        
+        // Set user name from session
+        setUserName(session.user?.name || 'Admin');
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        router.push('/auth/login');
+      }
+    };
+    
+    checkAuth();
   }, [router, pathname]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Clear localStorage (for legacy compatibility)
     localStorage.removeItem('authToken');
     localStorage.removeItem('userInfo');
-    router.push('/');
+    
+    // Use NextAuth signOut to properly clear the session
+    await signOut({ callbackUrl: '/auth/login' });
   };
 
   const handleLangChange = (lang: string) => {
