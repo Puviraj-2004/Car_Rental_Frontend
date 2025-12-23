@@ -4,9 +4,11 @@ import { NextResponse } from "next/server";
 export default withAuth(
   function middleware(req) {
     const token = req.nextauth.token;
-    const isAdminPage = req.nextUrl.pathname.startsWith("/admin");
-    if (isAdminPage && token?.role !== "ADMIN") {
-      return NextResponse.redirect(new URL("/", req.url));
+
+    if (req.nextUrl.pathname.startsWith("/admin")) {
+      if (token?.role !== "ADMIN") {
+        return NextResponse.redirect(new URL("/", req.url));
+      }
     }
   },
   {
@@ -16,4 +18,6 @@ export default withAuth(
   }
 );
 
-export const config = { matcher: ["/admin/:path*"] };
+export const config = {
+  matcher: ["/admin/:path*"],
+};

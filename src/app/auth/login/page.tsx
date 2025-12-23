@@ -12,15 +12,49 @@ import {
   Visibility, VisibilityOff, Close as CloseIcon 
 } from '@mui/icons-material';
 
-// 🛡️ TypeScript-க்கு Role இருப்பதை புரிய வைக்க
 interface CustomSession {
   user?: {
     name?: string | null;
     email?: string | null;
     image?: string | null;
-    role?: string; // 🚀 இதைக் கட்டாயம் சேர்க்க வேண்டும்
+    role?: string; 
   };
+  expires: string;
 }
+
+// Password validation function for login
+const validatePassword = (password: string) => {
+  const errors: string[] = [];
+  
+  if (password.length < 8) {
+    errors.push('Password should be at least 8 characters long');
+  }
+  
+  if (!/[A-Z]/.test(password)) {
+    errors.push('Password should contain at least one uppercase letter');
+  }
+  
+  if (!/[a-z]/.test(password)) {
+    errors.push('Password should contain at least one lowercase letter');
+  }
+  
+  if (!/[0-9]/.test(password)) {
+    errors.push('Password should contain at least one number');
+  }
+  
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    errors.push('Password should contain at least one special character');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
+const isWeakPassword = (password: string) => {
+  return !validatePassword(password).isValid;
+};
 
 export default function LoginPage() {
   const router = useRouter();
@@ -52,11 +86,17 @@ export default function LoginPage() {
     setErrorMessage("");
     setOpen(false);
 
+    // Check if password is weak and show warning
+    if (isWeakPassword(formData.password)) {
+      setErrorMessage("Warning: You're using a weak password. Please consider changing it after login for better security.");
+      setOpen(true);
+    }
+
     try {
       const result = await signIn('credentials', {
         email: formData.email,
         password: formData.password,
-        redirect: false, 
+        redirect: false, // Don't redirect automatically
       });
 
       if (result?.error) {
@@ -64,17 +104,15 @@ export default function LoginPage() {
         setErrorMessage(result.error || "Invalid email or password!");
         setOpen(true);
       } else if (result?.ok) {
-        // 🚀 getSession-ஐ CustomSession ஆக மாற்றுகிறோம்
-        const session = await getSession() as CustomSession;
-        setLoading(false);
-
-        if (session?.user?.role === 'ADMIN') {
-          router.push('/admin/dashboard'); 
-        } else {
-          router.push('/');
-        }
-        
-        router.refresh(); 
+        // Wait a bit for the session to update, then check the role
+        setTimeout(async () => {
+          const session = await getSession() as CustomSession;
+          if (session?.user?.role === 'ADMIN') {
+            router.push('/admin/dashboard');
+          } else {
+            router.push('/');
+          }
+        }, 500);
       }
     } catch (err: any) {
       setLoading(false);
@@ -146,6 +184,8 @@ export default function LoginPage() {
               value={formData.password}
               autoComplete="new-password"
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              error={formData.password.length > 0 && isWeakPassword(formData.password)}
+              helperText={formData.password.length > 0 && isWeakPassword(formData.password) ? "Weak password detected" : ""}
               InputProps={{ 
                 startAdornment: <InputAdornment position="start"><Lock color="action" fontSize="small" /></InputAdornment>,
                 endAdornment: (
@@ -164,7 +204,7 @@ export default function LoginPage() {
               fullWidth
               size="large"
               disabled={loading}
-              endIcon={!loading && <ArrowForward />}
+              endIcon={!loading}
               sx={{ 
                 bgcolor: '#293D91', 
                 py: 1.5, 
@@ -184,7 +224,20 @@ export default function LoginPage() {
             fullWidth
             size="large"
             startIcon={<Google sx={{ color: '#EA4335' }} />}
-            onClick={() => signIn('google', { callbackUrl: '/' })}
+            onClick={async () => {
+              const result = await signIn('google', { redirect: false });
+              if (result?.ok) {
+                // Wait for the session to update, then check the role
+                setTimeout(async () => {
+                  const session = await getSession() as CustomSession;
+                  if (session?.user?.role === 'ADMIN') {
+                    router.push('/admin/dashboard');
+                  } else {
+                    router.push('/');
+                  }
+                }, 500);
+              }
+            }}
             sx={{ 
               py: 1.2, 
               fontWeight: '600', 
