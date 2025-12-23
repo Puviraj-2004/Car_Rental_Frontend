@@ -1,8 +1,10 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useMutation, gql } from '@apollo/client';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Box, Container, Paper, Typography, Button, TextField, Alert, Stack } from '@mui/material';
 
 const VERIFY_OTP = gql`
@@ -16,8 +18,16 @@ const VERIFY_OTP = gql`
 
 export default function VerifyOTPPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const email = searchParams.get('email') || ''; // URL-இல் இருந்து email-ஐ எடுக்கும்
+  const [email, setEmail] = useState('');
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      setEmail(params.get('email') || '');
+    } catch (e) {
+      setEmail('');
+    }
+  }, []); // URL-இல் இருந்து email-ஐ எடுக்கும்
 
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [error, setError] = useState('');

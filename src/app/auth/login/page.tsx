@@ -1,8 +1,10 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import React, { useState, useEffect } from 'react';
 import { signIn, getSession } from 'next-auth/react'; // 🚀 ஒரே வரியில் இம்போர்ட்
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { 
   Box, Container, Paper, Typography, TextField, 
   Button, Alert, InputAdornment, Link, Divider, Snackbar, IconButton 
@@ -58,8 +60,36 @@ const isWeakPassword = (password: string) => {
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const urlError = searchParams.get('error');
+  const [urlError, setUrlError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Read URL error param directly from window to avoid useSearchParams SSR prerender warnings
+    try {
+      const params = new URLSearchParams(window.location.search);
+      setUrlError(params.get('error'));
+
+      // If there's a callbackUrl (e.g., after a failed server redirect flow), wait for session role then navigate to it
+      const cb = params.get('callbackUrl');
+      if (cb) {
+        (async () => {
+          setLoading(true);
+          const session = await waitForRole(20, 300);
+          setLoading(false);
+          if (session?.user?.role) {
+            try {
+              const target = new URL(cb, window.location.origin);
+              router.replace(target.pathname + target.search + target.hash);
+            } catch (e) {
+              // fallback for malformed callbackUrl
+              router.replace(cb);
+            }
+          }
+        })();
+      }
+    } catch (e) {
+      setUrlError(null);
+    }
+  }, []);
 
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
@@ -69,15 +99,63 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    if (urlError) {
-      setErrorMessage("Authentication failed. Please try again.");
+    if (!urlError) return;
+
+    // Map known NextAuth error codes to friendly messages
+    if (urlError === 'BACKEND_UNREACHABLE' || urlError.toLowerCase().includes('fetch')) {
+      setErrorMessage("Unable to reach backend server (http://localhost:4000). Please start the backend and try again.");
       setOpen(true);
+      return;
     }
+
+    if (urlError === 'CredentialsSignin') {
+      // Credentials failure may be because of wrong password OR because backend is down.
+      (async () => {
+        const reachable = await checkBackend();
+        if (!reachable) {
+          setErrorMessage("Unable to reach backend server (http://localhost:4000). Please start the backend and try again.");
+        } else {
+          setErrorMessage("Invalid email or password. Please try again.");
+        }
+        setOpen(true);
+      })();
+      return;
+    }
+
+    // Fallback
+    setErrorMessage("Authentication failed. Please try again.");
+    setOpen(true);
   }, [urlError]);
 
   const handleClose = (event?: React.SyntheticEvent | Event, reason?: string) => {
     if (reason === 'clickaway') return;
     setOpen(false);
+  };
+
+  const checkBackend = async (): Promise<boolean> => {
+    setLoading(true);
+    try {
+      const res = await fetch('http://localhost:4000/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: '{ __typename }' }),
+      });
+      setLoading(false);
+      return res.ok;
+    } catch (e: any) {
+      setLoading(false);
+      return false;
+    }
+  };
+
+  // Helper to wait until the NextAuth session contains a role (avoids race conditions)
+  const waitForRole = async (retries = 15, delay = 300) => {
+    for (let i = 0; i < retries; i++) {
+      const s = await getSession() as CustomSession;
+      if (s?.user?.role) return s;
+      await new Promise((res) => setTimeout(res, delay));
+    }
+    return null;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -93,26 +171,20 @@ export default function LoginPage() {
     }
 
     try {
+      // Use server-side redirect so NextAuth can send admins directly to the admin dashboard
       const result = await signIn('credentials', {
         email: formData.email,
         password: formData.password,
-        redirect: false, // Don't redirect automatically
+        redirect: true, // Let NextAuth perform the redirect (signIn callback will return admin URL)
+        callbackUrl: '/admin/dashboard', // prefer dashboard as callback so OAuth also lands there
       });
 
-      if (result?.error) {
+      // When redirect is true, a successful login will navigate away immediately.
+      // If we get a response back, it usually indicates an error.
+      if ((result as any)?.error) {
         setLoading(false);
-        setErrorMessage(result.error || "Invalid email or password!");
+        setErrorMessage((result as any).error || "Invalid email or password!");
         setOpen(true);
-      } else if (result?.ok) {
-        // Wait a bit for the session to update, then check the role
-        setTimeout(async () => {
-          const session = await getSession() as CustomSession;
-          if (session?.user?.role === 'ADMIN') {
-            router.push('/admin/dashboard');
-          } else {
-            router.push('/');
-          }
-        }, 500);
       }
     } catch (err: any) {
       setLoading(false);
@@ -150,7 +222,25 @@ export default function LoginPage() {
           </Box>
 
           {errorMessage && (
-            <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
+            <Alert
+              severity="error"
+              sx={{ mb: 3, borderRadius: 2 }}
+              action={
+                errorMessage.includes('Unable to reach backend') ? (
+                  <Button color="inherit" size="small" onClick={async () => {
+                    const reachable = await checkBackend();
+                    if (reachable) {
+                      setErrorMessage('Backend is reachable — try logging in again.');
+                    } else {
+                      setErrorMessage('Unable to reach backend server (http://localhost:4000). Start the backend: open a terminal, cd Car_Rental_Backend, and run `npm run dev`.');
+                    }
+                    setOpen(true);
+                  }}>
+                    Check backend
+                  </Button>
+                ) : null
+              }
+            >
               {errorMessage}
             </Alert>
           )}
@@ -224,19 +314,9 @@ export default function LoginPage() {
             fullWidth
             size="large"
             startIcon={<Google sx={{ color: '#EA4335' }} />}
-            onClick={async () => {
-              const result = await signIn('google', { redirect: false });
-              if (result?.ok) {
-                // Wait for the session to update, then check the role
-                setTimeout(async () => {
-                  const session = await getSession() as CustomSession;
-                  if (session?.user?.role === 'ADMIN') {
-                    router.push('/admin/dashboard');
-                  } else {
-                    router.push('/');
-                  }
-                }, 500);
-              }
+            onClick={() => {
+              // Use standard OAuth redirect flow for Google sign-in so the server handles the callback and redirect
+              signIn('google', { callbackUrl: '/admin/dashboard' });
             }}
             sx={{ 
               py: 1.2, 
