@@ -7,24 +7,46 @@ import {
   TableContainer, TableHead, TableRow, IconButton, Dialog,
   DialogTitle, DialogContent, DialogActions, Chip, CircularProgress,
   Alert, Grid, Card, CardMedia, CardContent, CardActions,
-  ToggleButtonGroup, ToggleButton, Stack, Avatar
+  ToggleButtonGroup, ToggleButton, Stack, Avatar, TextField, MenuItem,
+  Divider, alpha
 } from '@mui/material';
 import { 
   Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, 
   ViewList as ListIcon, ViewModule as GridIcon, 
-  DirectionsCar as CarIcon, LocalParking as PlateIcon 
+  DirectionsCar as CarIcon, LocalParking as PlateIcon,
+  Clear as ClearIcon, EvStation as FuelIcon,
+  SettingsInputComponent as GearIcon
 } from '@mui/icons-material';
 import { useQuery, useMutation } from '@apollo/client';
-import { GET_CARS_QUERY } from '@/lib/graphql/queries';
+import { GET_CARS_QUERY, GET_BRANDS_QUERY, GET_MODELS_QUERY } from '@/lib/graphql/queries';
 import { DELETE_CAR_MUTATION } from '@/lib/graphql/mutations';
 
 export default function CarsPage() {
   const router = useRouter();
-  const [view, setView] = useState<'list' | 'grid'>('list');
+  const [view, setView] = useState<'list' | 'grid'>('grid');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedCar, setSelectedCar] = useState({ id: '', name: '' });
 
-  const { loading, error, data, refetch } = useQuery(GET_CARS_QUERY);
+  // --- Filter States (Corrected for Enums) ---
+  const [filters, setFilters] = useState({
+    brandId: '',
+    modelId: '',
+    fuelType: undefined as string | undefined,
+    transmission: undefined as string | undefined,
+    availability: undefined as boolean | undefined
+  });
+
+  const { loading, error, data, refetch } = useQuery(GET_CARS_QUERY, {
+    variables: { filter: filters },
+    fetchPolicy: 'cache-and-network'
+  });
+
+  const { data: brandData } = useQuery(GET_BRANDS_QUERY);
+  const { data: modelData } = useQuery(GET_MODELS_QUERY, {
+    variables: { brandId: filters.brandId },
+    skip: !filters.brandId,
+  });
+
   const [deleteCar] = useMutation(DELETE_CAR_MUTATION, {
     onCompleted: () => {
       setDeleteDialogOpen(false);
@@ -32,39 +54,101 @@ export default function CarsPage() {
     },
   });
 
-  const BACKEND_URL ='http://localhost:4000';
+  const BACKEND_URL = 'http://localhost:4000';
 
-  const handleViewChange = (event: React.MouseEvent<HTMLElement>, nextView: 'list' | 'grid') => {
-    if (nextView !== null) setView(nextView);
+  const resetFilters = () => {
+    setFilters({ 
+      brandId: '', 
+      modelId: '', 
+      fuelType: undefined, 
+      transmission: undefined, 
+      availability: undefined 
+    });
   };
 
-  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}><CircularProgress /></Box>;
+  if (loading && !data) return (
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+      <CircularProgress thickness={5} size={50} sx={{ color: '#293D91' }} />
+    </Box>
+  );
 
   return (
-    <Box>
-      {/* Top Header Section */}
-      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 4 }}>
+    <Box sx={{ pb: 5 }}>
+      {/* Header Area */}
+      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} spacing={3} sx={{ mb: 4 }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800, color: '#0F172A' }}>Fleet Management</Typography>
-          <Typography variant="body2" color="text.secondary">Total {data?.cars?.length || 0} vehicles in your catalog</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 900, color: '#1E293B' }}>Fleet Management</Typography>
+          <Typography variant="body1" sx={{ color: '#64748B' }}>Total {data?.cars?.length || 0} vehicles tracked</Typography>
         </Box>
         
         <Stack direction="row" spacing={2}>
-          <ToggleButtonGroup value={view} exclusive onChange={handleViewChange} size="small" sx={{ bgcolor: '#fff' }}>
-            <ToggleButton value="list"><ListIcon /></ToggleButton>
-            <ToggleButton value="grid"><GridIcon /></ToggleButton>
-          </ToggleButtonGroup>
-          
+          <Paper elevation={0} sx={{ border: '1px solid #E2E8F0', p: 0.5, borderRadius: 2 }}>
+            <ToggleButtonGroup value={view} exclusive onChange={(_, v) => v && setView(v)} size="small">
+              <ToggleButton value="grid" sx={{ border: 'none' }}><GridIcon fontSize="small" /></ToggleButton>
+              <ToggleButton value="list" sx={{ border: 'none' }}><ListIcon fontSize="small" /></ToggleButton>
+            </ToggleButtonGroup>
+          </Paper>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => router.push('/admin/cars/add')}
-            sx={{ bgcolor: '#293D91', borderRadius: 2, textTransform: 'none', px: 3 }}
+            sx={{ bgcolor: '#293D91', borderRadius: 2.5, textTransform: 'none', px: 4, fontWeight: 700 }}
           >
             Add Vehicle
           </Button>
         </Stack>
       </Stack>
+
+      {/* 🔍 Corrected Filter Bar */}
+      <Paper elevation={0} sx={{ p: 3, mb: 4, borderRadius: 4, border: '1px solid #E2E8F0' }}>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6} md={2.4}>
+            <TextField select fullWidth size="small" label="Brand" value={filters.brandId} onChange={(e) => setFilters({ ...filters, brandId: e.target.value, modelId: '' })}>
+              <MenuItem value="">All Brands</MenuItem>
+              {brandData?.brands.map((b: any) => <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>)}
+            </TextField>
+          </Grid>
+          
+          <Grid item xs={12} sm={6} md={2.4}>
+            <TextField select fullWidth size="small" label="Model" value={filters.modelId} disabled={!filters.brandId} onChange={(e) => setFilters({ ...filters, modelId: e.target.value })}>
+              <MenuItem value="">All Models</MenuItem>
+              {modelData?.models.map((m: any) => <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>)}
+            </TextField>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={2.4}>
+            <TextField
+              select fullWidth size="small" label="Fuel"
+              value={filters.fuelType || ''}
+              onChange={(e) => setFilters({ ...filters, fuelType: e.target.value === '' ? undefined : e.target.value })}
+            >
+              <MenuItem value="">All Fuels</MenuItem>
+              <MenuItem value="PETROL">Petrol</MenuItem>
+              <MenuItem value="DIESEL">Diesel</MenuItem>
+              <MenuItem value="ELECTRIC">Electric</MenuItem>
+              <MenuItem value="HYBRID">Hybrid</MenuItem>
+            </TextField>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={2.4}>
+            <TextField
+              select fullWidth size="small" label="Status"
+              value={filters.availability === undefined ? '' : filters.availability.toString()}
+              onChange={(e) => setFilters({ ...filters, availability: e.target.value === '' ? undefined : e.target.value === 'true' })}
+            >
+              <MenuItem value="">All Status</MenuItem>
+              <MenuItem value="true">Available</MenuItem>
+              <MenuItem value="false">Unavailable</MenuItem>
+            </TextField>
+          </Grid>
+
+          <Grid item xs={12} md={2.4}>
+            <Button fullWidth variant="text" startIcon={<ClearIcon />} onClick={resetFilters} sx={{ color: '#64748B', textTransform: 'none' }}>
+              Reset Filters
+            </Button>
+          </Grid>
+        </Grid>
+      </Paper>
 
       {error && <Alert severity="error" sx={{ mb: 3 }}>{error.message}</Alert>}
 
@@ -72,42 +156,35 @@ export default function CarsPage() {
       {view === 'grid' && (
         <Grid container spacing={3}>
           {data?.cars.map((car: any) => (
-            <Grid item xs={12} sm={6} md={4} key={car.id}>
-              <Card sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+            <Grid item xs={12} sm={6} lg={4} key={car.id}>
+              <Card sx={{ borderRadius: 4, border: '1px solid #E2E8F0', boxShadow: 'none', '&:hover': { boxShadow: '0 10px 20px rgba(0,0,0,0.05)' } }}>
                 <Box sx={{ position: 'relative' }}>
-                <CardMedia
-                  component="img"
-                  height="180"
-                  image={car.images && car.images.length > 0 
-                    ? `${BACKEND_URL}${car.images[0].imagePath}` // முழுமையான URL
-                    : '/placeholder-car.png'}
-                  alt={car.model}
-                />
-                  <Chip
-                    label={car.availability ? 'Available' : 'Booked'}
-                    color={car.availability ? 'success' : 'error'}
-                    sx={{ position: 'absolute', top: 12, right: 12, fontWeight: 700, backdropFilter: 'blur(4px)' }}
+                  <CardMedia
+                    component="img" height="190"
+                    image={car.images?.length > 0 ? `${BACKEND_URL}${car.images.find((i: any) => i.isPrimary)?.imagePath || car.images[0].imagePath}` : '/placeholder.png'}
+                    sx={{ bgcolor: '#F8FAFC' }}
+                  />
+                  <Chip 
+                    label={car.availability ? 'Available' : 'Booked'} 
+                    size="small" 
+                    sx={{ position: 'absolute', top: 12, right: 12, fontWeight: 800, bgcolor: car.availability ? '#DCFCE7' : '#FEE2E2', color: car.availability ? '#166534' : '#991B1B' }} 
                   />
                 </Box>
-                <CardContent sx={{ pb: 1 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>{car.brand} {car.model}</Typography>
-                  <Stack direction="row" spacing={2} sx={{ mt: 1, color: 'text.secondary' }}>
-                    <Stack direction="row" alignItems="center" spacing={0.5}>
-                      <PlateIcon sx={{ fontSize: 16 }} />
-                      <Typography variant="caption" sx={{ fontWeight: 600 }}>{car.plateNumber}</Typography>
-                    </Stack>
-                    <Typography variant="caption" sx={{ fontWeight: 600 }}>• {car.fuelType}</Typography>
+                <CardContent>
+                  <Typography variant="h6" fontWeight={800}>{car.brand.name} {car.model.name}</Typography>
+                  <Stack direction="row" spacing={1} mt={1} mb={2}>
+                    <Chip label={car.plateNumber} size="small" variant="outlined" icon={<PlateIcon sx={{ fontSize: '14px !important' }} />} />
+                    <Chip label={car.fuelType} size="small" variant="outlined" icon={<FuelIcon sx={{ fontSize: '14px !important' }} />} />
                   </Stack>
-                  <Typography variant="h5" color="primary" sx={{ fontWeight: 800, mt: 2 }}>
-                    €{car.pricePerDay} <Typography component="span" variant="caption" color="text.secondary">/ day</Typography>
-                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="h5" fontWeight={900} color="#293D91">€{car.pricePerDay}<Typography component="span" variant="caption">/day</Typography></Typography>
+                    <Stack direction="row" spacing={1}>
+                      <IconButton size="small" onClick={() => router.push(`/admin/cars/${car.id}/edit`)} sx={{ bgcolor: '#F1F5F9' }}><EditIcon fontSize="small" /></IconButton>
+                      <IconButton size="small" color="error" onClick={() => { setSelectedCar({ id: car.id, name: car.model.name }); setDeleteDialogOpen(true); }} sx={{ bgcolor: alpha('#EF4444', 0.1) }}><DeleteIcon fontSize="small" /></IconButton>
+                    </Stack>
+                  </Stack>
                 </CardContent>
-                <CardActions sx={{ p: 2, pt: 0, justifyContent: 'space-between' }}>
-                  <Button size="small" variant="outlined" onClick={() => router.push(`/admin/cars/${car.id}/edit`)}>Edit</Button>
-                  <IconButton color="error" size="small" onClick={() => { setSelectedCar({ id: car.id, name: car.model }); setDeleteDialogOpen(true); }}>
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </CardActions>
               </Card>
             </Grid>
           ))}
@@ -116,15 +193,15 @@ export default function CarsPage() {
 
       {/* --- LIST VIEW --- */}
       {view === 'list' && (
-        <TableContainer component={Paper} sx={{ borderRadius: 3, boxShadow: 'none', border: '1px solid #E2E8F0' }}>
+        <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 4, border: '1px solid #E2E8F0', overflow: 'hidden' }}>
           <Table>
             <TableHead sx={{ bgcolor: '#F8FAFC' }}>
               <TableRow>
-                <TableCell sx={{ fontWeight: 700 }}>Vehicle</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Details</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Daily Rate</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700 }}>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 800 }}>Vehicle</TableCell>
+                <TableCell sx={{ fontWeight: 800 }}>Details</TableCell>
+                <TableCell sx={{ fontWeight: 800 }}>Daily Rate</TableCell>
+                <TableCell sx={{ fontWeight: 800 }}>Status</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 800 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -132,27 +209,19 @@ export default function CarsPage() {
                 <TableRow key={car.id} hover>
                   <TableCell>
                     <Stack direction="row" spacing={2} alignItems="center">
-                      <Avatar src={car.images?.[0]?.imagePath} variant="rounded" sx={{ width: 60, height: 45, bgcolor: '#f1f5f9' }}>
-                        <CarIcon />
-                      </Avatar>
+                      <Avatar src={`${BACKEND_URL}${car.images?.[0]?.imagePath}`} variant="rounded" sx={{ width: 60, height: 45, borderRadius: 2 }}><CarIcon /></Avatar>
                       <Box>
-                        <Typography sx={{ fontWeight: 700 }}>{car.brand} {car.model}</Typography>
+                        <Typography fontWeight={800}>{car.brand.name} {car.model.name}</Typography>
                         <Typography variant="caption" color="text.secondary">{car.plateNumber}</Typography>
                       </Box>
                     </Stack>
                   </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">{car.year} • {car.fuelType} • {car.transmission}</Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography sx={{ fontWeight: 800, color: '#293D91' }}>€{car.pricePerDay}</Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Chip label={car.availability ? 'Live' : 'Maintenance'} size="small" color={car.availability ? 'success' : 'warning'} sx={{ fontWeight: 600 }} />
-                  </TableCell>
+                  <TableCell>{car.year} • {car.fuelType}</TableCell>
+                  <TableCell><Typography fontWeight={900} color="#293D91">€{car.pricePerDay}</Typography></TableCell>
+                  <TableCell><Chip label={car.availability ? 'Available' : 'In Use'} size="small" sx={{ fontWeight: 800, bgcolor: car.availability ? '#DCFCE7' : '#FEE2E2', color: car.availability ? '#166534' : '#991B1B' }} /></TableCell>
                   <TableCell align="right">
-                    <IconButton size="small" sx={{ mr: 1, color: '#64748B' }} onClick={() => router.push(`/admin/cars/${car.id}/edit`)}><EditIcon fontSize="small" /></IconButton>
-                    <IconButton size="small" color="error" onClick={() => { setSelectedCar({ id: car.id, name: car.model }); setDeleteDialogOpen(true); }}><DeleteIcon fontSize="small" /></IconButton>
+                    <IconButton size="small" onClick={() => router.push(`/admin/cars/${car.id}/edit`)}><EditIcon fontSize="small" /></IconButton>
+                    <IconButton size="small" color="error" onClick={() => { setSelectedCar({ id: car.id, name: car.model.name }); setDeleteDialogOpen(true); }}><DeleteIcon fontSize="small" /></IconButton>
                   </TableCell>
                 </TableRow>
               ))}
@@ -162,14 +231,11 @@ export default function CarsPage() {
       )}
 
       {/* Delete Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} PaperProps={{ sx: { borderRadius: 3, p: 1 } }}>
-        <DialogTitle sx={{ fontWeight: 800 }}>Confirm Deletion</DialogTitle>
-        <DialogContent>
-          <Typography color="text.secondary">Are you sure you want to remove <b>{selectedCar.name}</b> from the fleet? This cannot be undone.</Typography>
-        </DialogContent>
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} PaperProps={{ sx: { borderRadius: 4, p: 1 } }}>
+        <DialogTitle sx={{ fontWeight: 900 }}>Remove Vehicle?</DialogTitle>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setDeleteDialogOpen(false)} sx={{ color: '#64748B' }}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={() => deleteCar({ variables: { id: selectedCar.id } })}>Delete Car</Button>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={() => deleteCar({ variables: { id: selectedCar.id } })}>Yes, Delete</Button>
         </DialogActions>
       </Dialog>
     </Box>

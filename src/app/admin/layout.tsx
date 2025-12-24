@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { getSession } from 'next-auth/react';
-import { signOut } from 'next-auth/react';
+import { getSession, signOut } from 'next-auth/react';
 import {
   Box, AppBar, Toolbar, IconButton, useMediaQuery, useTheme,
   Typography, Avatar, Tooltip, Menu, MenuItem, Divider, Stack, Badge, Button
@@ -11,7 +10,8 @@ import {
 import {
   Menu as MenuIcon, Dashboard, DirectionsCar, People, Payment,
   EventNote, Settings, Logout, Language as LanguageIcon,
-  NotificationsNone as NotificationsIcon
+  NotificationsNone as NotificationsIcon,
+  Category as InventoryIcon // 🚀 புதிய ஐகான்
 } from '@mui/icons-material';
 
 // --- Types ---
@@ -25,6 +25,7 @@ interface NavItem {
 const navItemsConfig: NavItem[] = [
   { label: 'Dashboard', icon: Dashboard, path: '/admin/dashboard' },
   { label: 'Cars', icon: DirectionsCar, path: '/admin/cars' },
+  { label: 'Inventory', icon: InventoryIcon, path: '/admin/inventory' }, // 🚀 இதுதான் புதிய மெனு
   { label: 'Bookings', icon: EventNote, path: '/admin/bookings' },
   { label: 'Users', icon: People, path: '/admin/users' },
   { label: 'Payments', icon: Payment, path: '/admin/payments' },
@@ -59,14 +60,12 @@ export default function AdminLayoutWrapper({ children }: { children: React.React
           return;
         }
         
-        // Check if user has admin role
         const userRole = (session.user as any)?.role;
         if (userRole !== 'ADMIN') {
           router.push('/');
           return;
         }
         
-        // Set user name from session
         setUserName(session.user?.name || 'Admin');
       } catch (error) {
         console.error('Auth check failed:', error);
@@ -78,11 +77,8 @@ export default function AdminLayoutWrapper({ children }: { children: React.React
   }, [router, pathname]);
 
   const handleLogout = async () => {
-    // Clear localStorage (for legacy compatibility)
     localStorage.removeItem('authToken');
     localStorage.removeItem('userInfo');
-    
-    // Use NextAuth signOut to properly clear the session
     await signOut({ callbackUrl: '/auth/login' });
   };
 
@@ -93,7 +89,6 @@ export default function AdminLayoutWrapper({ children }: { children: React.React
 
   const SidebarContent = () => (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#ffffff' }}>
-      {/* Brand Logo Area */}
       <Box sx={{ 
         p: 3, display: 'flex', alignItems: 'center', 
         justifyContent: collapsed ? 'center' : 'flex-start',
@@ -107,11 +102,10 @@ export default function AdminLayoutWrapper({ children }: { children: React.React
         )}
       </Box>
 
-      {/* Navigation */}
       <Box sx={{ flex: 1, px: 2, display: 'flex', flexDirection: 'column', gap: 0.8 }}>
         {navItemsConfig.map((item) => {
           const Icon = item.icon;
-          const isSelected = pathname?.startsWith(item.path || '');
+          const isSelected = pathname === item.path || pathname?.startsWith(item.path + '/');
           return (
             <Tooltip key={item.label} title={collapsed ? item.label : ''} placement="right">
               <Box
@@ -137,7 +131,6 @@ export default function AdminLayoutWrapper({ children }: { children: React.React
         })}
       </Box>
 
-      {/* Sidebar Footer Logout */}
       <Box sx={{ p: 2, borderTop: '1px solid #f1f5f9' }}>
         <Box
           component="button" onClick={handleLogout}
@@ -157,7 +150,6 @@ export default function AdminLayoutWrapper({ children }: { children: React.React
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#F8FAFC' }}>
-      {/* Sidebar Navigation */}
       <Box
         component="nav"
         sx={{
@@ -171,13 +163,11 @@ export default function AdminLayoutWrapper({ children }: { children: React.React
         <SidebarContent />
       </Box>
 
-      {/* Main Area */}
       <Box sx={{ 
         flex: 1, display: 'flex', flexDirection: 'column',
         marginLeft: { md: `${currentSidebarWidth}px` }, transition: '0.3s ease'
       }}>
         
-        {/* Top Header */}
         <AppBar position="sticky" elevation={0} sx={{ bgcolor: '#fff', borderBottom: '1px solid #e2e8f0', color: '#1E293B' }}>
           <Toolbar sx={{ justifyContent: 'space-between' }}>
             <Stack direction="row" alignItems="center" spacing={1}>
@@ -188,7 +178,6 @@ export default function AdminLayoutWrapper({ children }: { children: React.React
             </Stack>
 
             <Stack direction="row" alignItems="center" spacing={{ xs: 1, sm: 2 }}>
-              {/* Language Switcher - FIXED MUI BUTTON */}
               <Box>
                 <Button 
                   onClick={(e: React.MouseEvent<HTMLElement>) => setLangAnchor(e.currentTarget)}
@@ -221,13 +210,11 @@ export default function AdminLayoutWrapper({ children }: { children: React.React
           </Toolbar>
         </AppBar>
 
-        {/* Dynamic Content */}
         <Box component="main" sx={{ flex: 1, p: { xs: 2, md: 4 } }}>
           {children}
         </Box>
       </Box>
 
-      {/* Mobile Backdrop Overlay */}
       {mobileOpen && isMobile && (
         <Box onClick={() => setMobileOpen(false)} sx={{ position: 'fixed', inset: 0, bgcolor: 'rgba(15, 23, 42, 0.5)', zIndex: 1100, backdropFilter: 'blur(4px)' }} />
       )}

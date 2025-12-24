@@ -27,8 +27,6 @@ export default function HomePage() {
   const { loading, error, data } = useQuery(GET_CARS_QUERY);
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 20 }}><CircularProgress /></Box>;
-
-  // Search பட்டனை அழுத்தும்போது மட்டும் பில்டர் செய்யும் லாஜிக்
   const handleSearch = () => {
     setSearchTrigger({ brand: filters.brand, model: filters.model });
   };
@@ -109,7 +107,6 @@ export default function HomePage() {
                 <CardMedia 
                   component="img" 
                   height="220" 
-                  // 🚀 இமேஜ் தெரியச் செய்யும் மேஜிக் இங்கே:
                   image={car.images && car.images.length > 0 
                     ? `http://localhost:4000${car.images[0].imagePath}` 
                     : "https://via.placeholder.com/400x250?text=No+Image"} 
