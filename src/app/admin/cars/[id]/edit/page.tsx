@@ -103,8 +103,23 @@ export default function EditCarPage() {
 
     setIsUpdating(true);
     try {
-      const { brandId, modelId, ...input } = formData;
-      const updateInput = { ...input, brandId, modelId };
+      // Only include fields that are part of UpdateCarInput
+      const updateInput = {
+        year: formData.year,
+        plateNumber: formData.plateNumber,
+        fuelType: formData.fuelType,
+        transmission: formData.transmission,
+        seats: formData.seats,
+        pricePerHour: formData.pricePerHour,
+        pricePerKm: formData.pricePerKm,
+        pricePerDay: formData.pricePerDay,
+        critAirRating: formData.critAirRating,
+        status: formData.status,
+        descriptionEn: formData.descriptionEn,
+        descriptionFr: formData.descriptionFr,
+        brandId: formData.brandId,
+        modelId: formData.modelId,
+      };
       
       await updateCar({ variables: { id: carId, input: updateInput } });
 
@@ -121,7 +136,6 @@ export default function EditCarPage() {
     }
   };
 
-  // 🚀 Simple Loading Spinner (டேட்டா வரும் வரை மட்டும்)
   if (carLoading && !formData) return (
     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
       <CircularProgress size={40} sx={{ color: '#293D91' }} />
@@ -181,9 +195,9 @@ export default function EditCarPage() {
               <Grid item xs={12} sm={6}>
                 <Autocomplete
                   options={brandData?.brands || []}
-                  getOptionLabel={(opt) => opt.name}
+                  getOptionLabel={(opt: any) => opt.name}
                   value={brandData?.brands.find((b: any) => b.id === formData.brandId) || null}
-                  onChange={(_, newValue) => setFormData({ ...formData, brandId: newValue?.id || '', modelId: '' })}
+                  onChange={(_, newValue: any) => setFormData({ ...formData, brandId: newValue?.id || '', modelId: '' })}
                   renderInput={(p) => <TextField {...p} label="Select Brand" size="small" required />}
                 />
               </Grid>
@@ -191,9 +205,9 @@ export default function EditCarPage() {
                 <Autocomplete
                   disabled={!formData.brandId}
                   options={modelData?.models || []}
-                  getOptionLabel={(opt) => opt.name}
+                  getOptionLabel={(opt: any) => opt.name}
                   value={modelData?.models.find((m: any) => m.id === formData.modelId) || null}
-                  onChange={(_, newValue) => setFormData({ ...formData, modelId: newValue?.id || '' })}
+                  onChange={(_, newValue: any) => setFormData({ ...formData, modelId: newValue?.id || '' })}
                   renderInput={(p) => <TextField {...p} label="Select Model" size="small" required />}
                 />
               </Grid>
@@ -215,6 +229,13 @@ export default function EditCarPage() {
                   </Select>
                 </FormControl>
               </Grid>
+              <Grid item xs={6}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>CritAir Rating</InputLabel>
+                  <Select name="critAirRating" value={formData.critAirRating} onChange={handleInputChange} label="CritAir Rating">
+                    {enumData?.critAirEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>)}</Select>
+                </FormControl>
+              </Grid>
             </Grid>
           </Paper>
         )}
@@ -226,10 +247,11 @@ export default function EditCarPage() {
               <Grid item xs={4}><TextField fullWidth size="small" label="Price/Day (€)" name="pricePerDay" type="number" value={formData.pricePerDay} onChange={handleInputChange} /></Grid>
               <Grid item xs={4}><TextField fullWidth size="small" label="Price/Km (€)" name="pricePerKm" type="number" value={formData.pricePerKm} onChange={handleInputChange} /></Grid>
               <Grid item xs={12}>
-                <FormControlLabel 
-                  control={<Switch checked={formData.availability} onChange={(e) => setFormData({...formData, availability: e.target.checked})} />} 
-                  label="Available for Booking" 
-                />
+                <FormControl fullWidth size="small">
+                  <InputLabel>Status</InputLabel>
+                  <Select name="status" value={formData.status} onChange={handleInputChange} label="Status">
+                    {enumData?.carStatusEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>)}</Select>
+                </FormControl>
               </Grid>
             </Grid>
           </Paper>

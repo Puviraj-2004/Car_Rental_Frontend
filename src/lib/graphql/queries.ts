@@ -12,6 +12,9 @@ export const GET_CAR_ENUMS = gql`
     critAirEnum: __type(name: "CritAirCategory") {
       enumValues { name }
     }
+    carStatusEnum: __type(name: "CarStatus") {
+      enumValues { name }
+    }
   }
 `;
 
@@ -46,11 +49,12 @@ export const GET_CARS_QUERY = gql`
       plateNumber
       fuelType
       transmission
+      seats
       pricePerHour
       pricePerKm
       pricePerDay
       critAirRating
-      availability
+      status
       images {
         id
         imagePath
@@ -76,7 +80,7 @@ export const GET_CAR_QUERY = gql`
       pricePerKm
       pricePerDay
       critAirRating
-      availability
+      status
       descriptionEn
       descriptionFr
       images {
@@ -105,7 +109,7 @@ export const GET_AVAILABLE_CARS_QUERY = gql`
       pricePerKm
       pricePerDay
       critAirRating
-      availability
+      status
       images {
         id
         imagePath

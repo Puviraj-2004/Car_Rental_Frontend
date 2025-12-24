@@ -33,7 +33,8 @@ export default function CarsPage() {
     modelId: '',
     fuelType: undefined as string | undefined,
     transmission: undefined as string | undefined,
-    availability: undefined as boolean | undefined
+    status: undefined as string | undefined,
+    critAirRating: undefined as string | undefined
   });
 
   const { loading, error, data, refetch } = useQuery(GET_CARS_QUERY, {
@@ -62,7 +63,8 @@ export default function CarsPage() {
       modelId: '', 
       fuelType: undefined, 
       transmission: undefined, 
-      availability: undefined 
+      status: undefined,
+      critAirRating: undefined 
     });
   };
 
@@ -133,12 +135,31 @@ export default function CarsPage() {
           <Grid item xs={12} sm={6} md={2.4}>
             <TextField
               select fullWidth size="small" label="Status"
-              value={filters.availability === undefined ? '' : filters.availability.toString()}
-              onChange={(e) => setFilters({ ...filters, availability: e.target.value === '' ? undefined : e.target.value === 'true' })}
+              value={filters.status || ''}
+              onChange={(e) => setFilters({ ...filters, status: e.target.value || undefined })}
             >
               <MenuItem value="">All Status</MenuItem>
-              <MenuItem value="true">Available</MenuItem>
-              <MenuItem value="false">Unavailable</MenuItem>
+              <MenuItem value="AVAILABLE">Available</MenuItem>
+              <MenuItem value="BOOKED">Booked</MenuItem>
+              <MenuItem value="MAINTENANCE">Maintenance</MenuItem>
+            </TextField>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={2.4}>
+            <TextField
+              select fullWidth size="small" label="CritAir Rating"
+              value={filters.critAirRating || ''}
+              onChange={(e) => setFilters({ ...filters, critAirRating: e.target.value || undefined })}
+            >
+              <MenuItem value="">All Ratings</MenuItem>
+              <MenuItem value="CRIT_AIR_0">Crit'Air 0</MenuItem>
+              <MenuItem value="CRIT_AIR_1">Crit'Air 1</MenuItem>
+              <MenuItem value="CRIT_AIR_2">Crit'Air 2</MenuItem>
+              <MenuItem value="CRIT_AIR_3">Crit'Air 3</MenuItem>
+              <MenuItem value="CRIT_AIR_4">Crit'Air 4</MenuItem>
+              <MenuItem value="CRIT_AIR_5">Crit'Air 5</MenuItem>
+              <MenuItem value="CRIT_AIR_6">Crit'Air 6</MenuItem>
+              <MenuItem value="NO_STICKER">No Sticker</MenuItem>
             </TextField>
           </Grid>
 
@@ -165,9 +186,9 @@ export default function CarsPage() {
                     sx={{ bgcolor: '#F8FAFC' }}
                   />
                   <Chip 
-                    label={car.availability ? 'Available' : 'Booked'} 
+                    label={car.status} 
                     size="small" 
-                    sx={{ position: 'absolute', top: 12, right: 12, fontWeight: 800, bgcolor: car.availability ? '#DCFCE7' : '#FEE2E2', color: car.availability ? '#166534' : '#991B1B' }} 
+                    sx={{ position: 'absolute', top: 12, right: 12, fontWeight: 800, bgcolor: car.status === 'AVAILABLE' ? '#DCFCE7' : car.status === 'BOOKED' ? '#FEE2E2' : '#FDE68A', color: car.status === 'AVAILABLE' ? '#166534' : car.status === 'BOOKED' ? '#991B1B' : '#92400E' }} 
                   />
                 </Box>
                 <CardContent>
@@ -175,6 +196,7 @@ export default function CarsPage() {
                   <Stack direction="row" spacing={1} mt={1} mb={2}>
                     <Chip label={car.plateNumber} size="small" variant="outlined" icon={<PlateIcon sx={{ fontSize: '14px !important' }} />} />
                     <Chip label={car.fuelType} size="small" variant="outlined" icon={<FuelIcon sx={{ fontSize: '14px !important' }} />} />
+                    <Chip label={car.critAirRating === 'NO_STICKER' ? 'No Sticker' : car.critAirRating.replace('CRIT_AIR_', 'Crit\'Air ')} size="small" variant="outlined" icon={<CarIcon sx={{ fontSize: '14px !important' }} />} />
                   </Stack>
                   <Divider sx={{ mb: 2 }} />
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -216,9 +238,9 @@ export default function CarsPage() {
                       </Box>
                     </Stack>
                   </TableCell>
-                  <TableCell>{car.year} • {car.fuelType}</TableCell>
+                  <TableCell>{car.year} • {car.fuelType} • {car.critAirRating === 'NO_STICKER' ? 'No Sticker' : car.critAirRating.replace('CRIT_AIR_', 'Crit\'Air ')}</TableCell>
                   <TableCell><Typography fontWeight={900} color="#293D91">€{car.pricePerDay}</Typography></TableCell>
-                  <TableCell><Chip label={car.availability ? 'Available' : 'In Use'} size="small" sx={{ fontWeight: 800, bgcolor: car.availability ? '#DCFCE7' : '#FEE2E2', color: car.availability ? '#166534' : '#991B1B' }} /></TableCell>
+                  <TableCell><Chip label={car.status} size="small" sx={{ fontWeight: 800, bgcolor: car.status === 'AVAILABLE' ? '#DCFCE7' : car.status === 'BOOKED' ? '#FEE2E2' : '#FDE68A', color: car.status === 'AVAILABLE' ? '#166534' : car.status === 'BOOKED' ? '#991B1B' : '#92400E' }} /></TableCell>
                   <TableCell align="right">
                     <IconButton size="small" onClick={() => router.push(`/admin/cars/${car.id}/edit`)}><EditIcon fontSize="small" /></IconButton>
                     <IconButton size="small" color="error" onClick={() => { setSelectedCar({ id: car.id, name: car.model.name }); setDeleteDialogOpen(true); }}><DeleteIcon fontSize="small" /></IconButton>

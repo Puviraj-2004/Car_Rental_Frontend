@@ -113,7 +113,9 @@ export default function HomePage() {
                   alt={car.model}
                 />
                 <CardContent sx={{ flexGrow: 1 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>{car.brand} {car.model}</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    {car.brand.name} {car.model.name}
+                  </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{car.year}</Typography>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="h6" color="primary" sx={{ fontWeight: 700 }}>€{car.pricePerDay}/day</Typography>

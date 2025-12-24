@@ -17,7 +17,7 @@ export const CREATE_CAR_MUTATION = gql`
       pricePerKm
       pricePerDay
       critAirRating
-      availability
+      status
       createdAt
     }
   }
@@ -31,7 +31,18 @@ export const UPDATE_CAR_MUTATION = gql`
       modelId
       year
       plateNumber
-      availability
+      fuelType
+      transmission
+      seats
+      pricePerHour
+      pricePerKm
+      pricePerDay
+      critAirRating
+      status
+      descriptionEn
+      descriptionFr
+      createdAt
+      updatedAt
     }
   }
 `;
