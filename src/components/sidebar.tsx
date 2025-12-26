@@ -12,6 +12,7 @@ import {
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@apollo/client';
 import { GET_PLATFORM_SETTINGS_QUERY } from '@/lib/graphql/queries'; // உன்னுடைய குவெரி
+import { signOut } from 'next-auth/react';
 
 const drawerWidth = 260;
 const collapsedWidth = 80;
@@ -37,7 +38,7 @@ export default function AdminSidebar() {
 
   const handleLogout = () => {
     localStorage.clear();
-    router.push('/login');
+    signOut({ callbackUrl: '/login' });
   };
 
   return (

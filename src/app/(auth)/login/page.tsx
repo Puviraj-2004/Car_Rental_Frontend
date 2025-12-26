@@ -53,7 +53,7 @@ export default function UserLoginPage() {
       if (userRole === "ADMIN") {
         router.push('/admin/dashboard');
       } else {
-        router.push('/dashboard');
+        router.push('/');
       }
       router.refresh();
     }
@@ -61,7 +61,7 @@ export default function UserLoginPage() {
 
   // Handle Google Login
   const handleGoogleLogin = () => {
-    signIn('google', { callbackUrl: '/dashboard' });
+    signIn('google', { callbackUrl: '/' });
   };
 
   const inputStyles = {

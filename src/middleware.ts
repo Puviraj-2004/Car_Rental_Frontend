@@ -9,13 +9,17 @@ export default withAuth(
     const userRole = token?.role as string;
 
     if (pathname.startsWith("/admin") && userRole !== "ADMIN") {
-      return NextResponse.redirect(new URL("/dashboard", req.url));
+      return NextResponse.redirect(new URL("/", req.url));
     }
 
     const authPages = ["/login", "/register"];
-    if ((authPages.includes(pathname) || pathname === "/") && token) {
-      const redirectUrl = userRole === "ADMIN" ? "/admin/dashboard" : "/dashboard";
+    if (token && authPages.includes(pathname)) {
+      const redirectUrl = userRole === "ADMIN" ? "/admin/dashboard" : "/";
       return NextResponse.redirect(new URL(redirectUrl, req.url));
+    }
+
+    if (token && pathname === "/" && userRole === "ADMIN") {
+      return NextResponse.redirect(new URL("/admin/dashboard", req.url));
     }
 
     return NextResponse.next();
