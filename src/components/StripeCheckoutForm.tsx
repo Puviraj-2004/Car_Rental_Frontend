@@ -1,28 +1,26 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
-import { useMutation } from '@apollo/client/react';
+import { useMutation } from '@apollo/client';
 import { gql } from '@apollo/client';
 import Button from '@mui/material/Button';
-import TextField from '@mui/material/TextField';
 import Box from '@mui/material/Box';
 import Alert from '@mui/material/Alert';
-import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
-import { getTranslation } from '@/lib/i18n';
+import Typography from '@mui/material/Typography';
 
-// GraphQL mutation to create booking
-const CREATE_BOOKING = gql`
-  mutation CreateBooking($input: CreateBookingInput!) {
-    createBooking(input: $input) {
+// 🚀 நம்முடைய புதிய Schema-விற்கு ஏற்ற Mutation
+const CREATE_PAYMENT = gql`
+  mutation CreatePayment($input: CreatePaymentInput!) {
+    createPayment(input: $input) {
       id
-      startDate
-      endDate
-      totalPrice
-      basePrice
-      taxAmount
       status
+      transactionId
+      booking {
+        id
+        status
+      }
     }
   }
 `;
@@ -30,12 +28,12 @@ const CREATE_BOOKING = gql`
 const CARD_ELEMENT_OPTIONS = {
   style: {
     base: {
-      color: '#000',
-      fontFamily: 'Arial, sans-serif',
+      color: '#32325d',
+      fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
       fontSmoothing: 'antialiased',
       fontSize: '16px',
       '::placeholder': {
-        color: 'rgba(0,0,0,0.5)',
+        color: '#aab7c4',
       },
     },
     invalid: {
@@ -45,36 +43,20 @@ const CARD_ELEMENT_OPTIONS = {
   },
 };
 
-export default function StripeCheckoutForm({ 
-  carId, 
-  startDate, 
-  endDate, 
-  pickupLocation, 
-  dropoffLocation,
-  onSuccess 
-}: { 
-  carId: string; 
-  startDate: string; 
-  endDate: string; 
-  pickupLocation: string; 
-  dropoffLocation: string;
-  onSuccess: (bookingId: string) => void;
-}) {
+interface CheckoutProps {
+  bookingId: string;
+  amount: number;
+  onSuccess: () => void;
+}
+
+export default function StripeCheckoutForm({ bookingId, amount, onSuccess }: CheckoutProps) {
   const stripe = useStripe();
   const elements = useElements();
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
+  
   const [error, setError] = useState('');
   const [processing, setProcessing] = useState(false);
-  const [language, setLanguage] = useState('en');
-
-  useEffect(() => {
-    // Get language from localStorage or default to 'en'
-    const lang = typeof window !== 'undefined' ? localStorage.getItem('language') || 'en' : 'en';
-    setLanguage(lang);
-  }, []);
-
-  const [createBooking] = useMutation(CREATE_BOOKING);
+  
+  const [createPayment] = useMutation(CREATE_PAYMENT);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -82,8 +64,6 @@ export default function StripeCheckoutForm({
     setError('');
 
     if (!stripe || !elements) {
-      // Stripe.js has not yet loaded.
-      setError(getTranslation(language, 'errors.stripeNotLoaded'));
       setProcessing(false);
       return;
     }
@@ -91,65 +71,59 @@ export default function StripeCheckoutForm({
     const cardElement = elements.getElement(CardElement);
 
     if (!cardElement) {
-      setError(getTranslation(language, 'errors.cardElementNotFound'));
+      setError('Credit card details not found.');
       setProcessing(false);
       return;
     }
 
     try {
-      // Create booking in our system first
-      const { data } = await createBooking({
+      // 1. Stripe Payment Method-ஐ உருவாக்கவும்
+      const { error: stripeError, paymentMethod } = await stripe.createPaymentMethod({
+        type: 'card',
+        card: cardElement,
+      });
+
+      if (stripeError) {
+        throw new Error(stripeError.message);
+      }
+
+      // 2. Backend-ல் Payment Record-ஐ உருவாக்கவும்
+      // (குறிப்பு: Industrial App-ல், Backend-ல் Stripe Intent உருவாக்கி confirm செய்ய வேண்டும்.
+      // இது ஒரு Basic Implementation)
+      
+      const { data } = await createPayment({
         variables: {
           input: {
-            carId,
-            startDate,
-            endDate,
-            pickupLocation: pickupLocation || null,
-            dropoffLocation: dropoffLocation || null,
+            bookingId: bookingId,
+            amount: amount,
+            currency: "EUR",
+            paymentMethod: "CREDIT_CARD",
+            transactionId: paymentMethod.id, // Stripe ID-ஐ சேமிக்கிறோம்
           }
         }
       });
 
-      // In a real implementation, we would call our backend to create a Stripe payment intent
-      // and then confirm the payment with Stripe.js
-      // For this example, we'll simulate a successful payment
-
-      // Simulate payment processing delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Simulate successful payment
-      const paymentResult = { error: null };
-
+      if (data?.createPayment?.status === 'COMPLETED' || data?.createPayment?.status === 'PENDING') {
+         onSuccess(); // Payment Success!
+      } else {
+         setError('Payment failed on server side.');
+      }
 
     } catch (err: any) {
-      setError(err.message || getTranslation(language, 'errors.generic'));
+      setError(err.message || 'Payment processing failed.');
     }
 
     setProcessing(false);
   };
 
   return (
-    <Box component="form" onSubmit={handleSubmit}>
-      <TextField
-        label={getTranslation(language, 'booking.email')}
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        fullWidth
-        margin="normal"
-        required
-      />
+    <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 500, mx: 'auto', p: 2 }}>
       
-      <TextField
-        label={getTranslation(language, 'booking.nameOnCard')}
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        fullWidth
-        margin="normal"
-        required
-      />
-      
-      <Box sx={{ p: 2, border: '1px solid #ccc', borderRadius: 1, mt: 2, mb: 2 }}>
+      <Typography variant="h6" gutterBottom>
+        Pay €{amount.toFixed(2)} to Confirm
+      </Typography>
+
+      <Box sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 2, bgcolor: '#fafafa', mb: 3 }}>
         <CardElement options={CARD_ELEMENT_OPTIONS} />
       </Box>
       
@@ -166,20 +140,20 @@ export default function StripeCheckoutForm({
         size="large"
         disabled={!stripe || processing}
         fullWidth
-        sx={{ mt: 2 }}
+        sx={{ py: 1.5, fontWeight: 'bold' }}
       >
         {processing ? (
           <>
-            <CircularProgress size={24} sx={{ mr: 1 }} />
-            {getTranslation(language, 'booking.processing')}
+            <CircularProgress size={24} color="inherit" sx={{ mr: 1 }} />
+            Processing...
           </>
         ) : (
-          getTranslation(language, 'booking.payNow')
+          `Pay €${amount.toFixed(2)}`
         )}
       </Button>
       
-      <Typography variant="body2" sx={{ mt: 2, textAlign: 'center', color: 'text.secondary' }}>
-        {getTranslation(language, 'booking.testCardInfo')}
+      <Typography variant="caption" display="block" sx={{ mt: 2, textAlign: 'center', color: 'text.secondary' }}>
+        Payments are secured by Stripe.
       </Typography>
     </Box>
   );

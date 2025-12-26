@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
     "target": "es5",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "es6"
-    ],
+    "lib": ["dom", "dom.iterable", "es6"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -25,9 +21,9 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"],
+      // 🚀 இந்த வரியைச் சேர்ப்பதன் மூலம் TypeScript-க்கு அந்த மாடுலை எங்கே தேட வேண்டும் என்று காட்டுகிறோம்
+      "apollo-upload-client": ["node_modules/apollo-upload-client/public/index.mjs"]
     }
   },
   "include": [
@@ -35,9 +31,8 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
-, "src/middleware.ts"  ],
-  "exclude": [
-    "node_modules"
-  ]
+    ".next/dev/types/**/*.ts",
+    "src/middleware.ts"
+  ],
+  "exclude": ["node_modules"]
 }
