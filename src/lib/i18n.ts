@@ -8,16 +8,26 @@ const locales: Record<string, any> = {
 
 export const getTranslation = (lang: string, key: string, params?: Record<string, string>): string => {
   const keys = key.split('.');
-  let translation = locales[lang];
+  
+  // Default to English if lang is invalid
+  let translation = locales[lang] || locales['en']; 
 
+  // Traverse the object
   for (const k of keys) {
-    if (!translation[k]) {
-      return key; // Return the key if translation not found
+    if (translation && translation[k]) {
+      translation = translation[k];
+    } else {
+      // Key not found
+      return key; 
     }
-    translation = translation[k];
   }
 
-  // Replace placeholders with actual values
+  // If result is not a string (e.g. it's still an object), return key
+  if (typeof translation !== 'string') {
+    return key;
+  }
+
+  // Replace {{placeholders}}
   if (params) {
     Object.keys(params).forEach(param => {
       translation = translation.replace(new RegExp(`{{${param}}}`, 'g'), params[param]);
@@ -27,17 +37,19 @@ export const getTranslation = (lang: string, key: string, params?: Record<string
   return translation;
 };
 
+// Get User Language from LocalStorage
 export const getUserLanguage = (): string => {
-  // In a real app, you would get this from user preferences, browser settings, etc.
-  // For now, we'll default to English
   if (typeof window !== 'undefined') {
     return localStorage.getItem('language') || 'en';
   }
   return 'en';
 };
 
+// Set User Language
 export const setUserLanguage = (lang: string): void => {
   if (typeof window !== 'undefined') {
     localStorage.setItem('language', lang);
+    // Optional: Refresh page to apply changes if not using a reactive context
+    // window.location.reload(); 
   }
 };

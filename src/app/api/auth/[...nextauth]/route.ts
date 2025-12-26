@@ -8,91 +8,113 @@ const handler = NextAuth({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
-
     CredentialsProvider({
       name: "Credentials",
       credentials: {
         email: { label: "Email", type: "text" },
-        password: { label: "Password", type: "password" },
+        password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        const res = await fetch("http://localhost:4000/graphql", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query: `
-              mutation Login($input: LoginInput!) {
-                login(input: $input) {
-                  token
-                  user {
-                    id
-                    email
-                    firstName
-                    lastName
-                    role
+        try {
+          // ⚠️ API URL சரியாக இருப்பதை உறுதி செய்யவும்
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/graphql";
+          
+          const res = await fetch(apiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              query: `
+                mutation Login($input: LoginInput!) {
+                  login(input: $input) {
+                    token
+                    user { id email username role phoneNumber isEmailVerified }
                   }
                 }
+              `,
+              variables: {
+                input: { email: credentials?.email, password: credentials?.password }
               }
-            `,
-            variables: {
-              input: {
-                email: credentials?.email,
-                password: credentials?.password,
-              },
-            },
-          }),
-        });
+            })
+          });
 
-        const json = await res.json();
+          const responseData = await res.json();
 
-        if (json.errors) return null;
+          if (responseData.errors) {
+            console.error("Backend Auth Error:", responseData.errors[0].message);
+            throw new Error(responseData.errors[0].message);
+          }
 
-        return {
-          id: json.data.login.user.id,
-          email: json.data.login.user.email,
-          name: `${json.data.login.user.firstName} ${json.data.login.user.lastName}`,
-          role: json.data.login.user.role,
-          accessToken: json.data.login.token,
-        };
-      },
-    }),
+          const user = responseData.data?.login?.user;
+          const token = responseData.data?.login?.token;
+
+          if (user && token) {
+            return {
+              ...user,
+              accessToken: token
+            };
+          }
+          
+          return null;
+        } catch (error: any) {
+          console.error("Authorize function error:", error.message);
+          return null;
+        }
+      }
+    })
   ],
-
-  session: { strategy: "jwt" },
-  secret: process.env.NEXTAUTH_SECRET,
-
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }: any) {
+      if (account && account.provider === "google") {
+        try {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/graphql";
+          const res = await fetch(apiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              query: `
+                mutation GoogleLogin($idToken: String!) {
+                  googleLogin(idToken: $idToken) {
+                    token
+                    user { id email username role }
+                  }
+                }
+              `,
+              variables: { idToken: account.id_token }
+            })
+          });
+
+          const { data } = await res.json();
+          if (data?.googleLogin) {
+            token.accessToken = data.googleLogin.token;
+            token.role = data.googleLogin.user.role;
+            token.username = data.googleLogin.user.username;
+          }
+        } catch (error) {
+          console.error("NextAuth Google sync error:", error);
+        }
+      }
+
       if (user) {
-        token.role = (user as any).role;
-        token.accessToken = (user as any).accessToken;
-        token.id = (user as any).id;
+        token.accessToken = user.accessToken;
+        token.role = user.role;
+        token.username = user.username;
+        token.id = user.id;
       }
       return token;
     },
-
-    async session({ session, token }) {
-      if (session.user) {
-        (session.user as any).role = token.role;
-        (session.user as any).accessToken = token.accessToken;
-        (session.user as any).id = token.id;
+    async session({ session, token }: any) {
+      if (token) {
+        session.accessToken = token.accessToken;
+        session.user.role = token.role;
+        session.user.username = token.username;
+        session.user.id = token.id;
       }
       return session;
-    },
-    
-    async redirect({ url, baseUrl }) {
-      // The redirect logic will be handled by the login page and middleware
-      // Since we can't access the token in the redirect callback directly
-      // we'll rely on the middleware and page-level checks
-      
-      // Default behavior: allow callback to the same domain
-      return url.startsWith(baseUrl) ? url : baseUrl;
     }
   },
-
-  pages: {
-    signIn: "/auth/login",
-  },
+  pages: { signIn: "/login" },
+  session: { strategy: "jwt" },
+  secret: process.env.NEXTAUTH_SECRET,
 });
 
 export { handler as GET, handler as POST };

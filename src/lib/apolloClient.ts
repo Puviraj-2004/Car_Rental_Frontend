@@ -1,9 +1,9 @@
 import { ApolloClient, InMemoryCache, from } from '@apollo/client';
 import { onError } from '@apollo/client/link/error';
-
-// பழைய .mjs வரியை நீக்கிவிட்டு இதை மட்டும் பயன்படுத்தவும்
-// @ts-ignore
-import createUploadLink from 'apollo-upload-client/public/createUploadLink.js';
+import { setContext } from '@apollo/client/link/context';
+import { createUploadLink } from 'apollo-upload-client';
+import { getCookie } from 'cookies-next';
+import { getSession } from 'next-auth/react';
 
 const errorLink = onError(({ graphQLErrors, networkError }) => {
   if (graphQLErrors) {
@@ -13,16 +13,37 @@ const errorLink = onError(({ graphQLErrors, networkError }) => {
   }
 });
 
-// HttpLink-க்கு பதிலாக createUploadLink
+// ✅ createUploadLink இப்போது வேலை செய்யும்
 const uploadLink = createUploadLink({
-  uri: 'http://localhost:4000/graphql',
-  headers: {
-    "Apollo-Require-Preflight": "true",
+  uri: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql',
+  headers: { 
+    "Apollo-Require-Preflight": "true" 
   },
 });
 
+const authLink = setContext(async (_, { headers }) => {
+  let token = null;
+  try {
+    const session: any = await getSession();
+    token = session?.accessToken;
+  } catch (error) {
+    console.error('Error getting session:', error);
+  }
+  
+  if (!token) {
+    token = getCookie('token');
+  }
+  
+  return {
+    headers: {
+      ...headers,
+      authorization: token ? `Bearer ${token}` : "",
+    }
+  };
+});
+
 const client = new ApolloClient({
-  link: from([errorLink, uploadLink]),
+  link: from([errorLink, authLink, uploadLink]),
   cache: new InMemoryCache(),
 });
 
