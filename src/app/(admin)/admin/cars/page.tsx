@@ -38,11 +38,17 @@ export default function CarsPage() {
     fuelType: undefined as string | undefined,
     transmission: undefined as string | undefined,
     status: undefined as string | undefined,
-    critAirRating: undefined as string | undefined
+    critAirRating: undefined as string | undefined,
+    includeOutOfService: true
   });
 
   const { loading, error, data, refetch } = useQuery(GET_CARS_QUERY, {
-    variables: { filter: filters },
+    variables: {
+      filter: {
+        ...filters,
+        includeOutOfService: true // Admin should see ALL cars including OUT_OF_SERVICE
+      }
+    },
     fetchPolicy: 'cache-and-network'
   });
 
@@ -62,9 +68,10 @@ export default function CarsPage() {
   });
 
   const resetFilters = () => {
-    setFilters({ 
-      brandId: '', modelId: '', fuelType: undefined, 
-      transmission: undefined, status: undefined, critAirRating: undefined 
+    setFilters({
+      brandId: '', modelId: '', fuelType: undefined,
+      transmission: undefined, status: undefined, critAirRating: undefined,
+      includeOutOfService: true
     });
   };
 
@@ -122,7 +129,7 @@ export default function CarsPage() {
                   <CardMedia
                     component="img" height="190"
                     // ✅ மாற்றப்பட்டது: API_BASE_URL நீக்கப்பட்டது
-                    image={car.images?.length > 0 ? (car.images.find((i: any) => i.isPrimary)?.imagePath || car.images[0].imagePath) : '/placeholder.png'}
+                    image={car.images?.length > 0 ? (car.images.find((i: any) => i.isPrimary)?.imagePath || car.images[0].imagePath) : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2VlZWVlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iMC4zNWVtIiBmaWxsPSIjYWFhYWFhIiBmb250LXNpemU9IjE0Ij5ObyBJbWFnZTwvdGV4dD48L3N2Zz4='}
                     sx={{ bgcolor: '#F8FAFC', objectFit: 'cover' }}
                   />
                   <Chip label={car.status} size="small" sx={{ position: 'absolute', top: 12, right: 12, fontWeight: 800, bgcolor: car.status === 'AVAILABLE' ? '#DCFCE7' : '#FEE2E2', color: car.status === 'AVAILABLE' ? '#166534' : '#991B1B' }} />
@@ -137,7 +144,7 @@ export default function CarsPage() {
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
                     <Typography variant="h5" fontWeight={900} color="#293D91">€{car.pricePerDay}<Typography component="span" variant="caption">/day</Typography></Typography>
                     <Stack direction="row" spacing={1}>
-                      <IconButton size="small" onClick={() => router.push(`/admin/cars/${car.id}/edit`)} sx={{ bgcolor: '#F1F5F9' }}><EditIcon fontSize="small" /></IconButton>
+                      <IconButton size="small" onClick={() => router.push(`/admin/cars/${car.id}`)} sx={{ bgcolor: '#F1F5F9' }}><EditIcon fontSize="small" /></IconButton>
                       <IconButton size="small" color="error" onClick={() => { setSelectedCar({ id: car.id, name: car.model.name }); setDeleteDialogOpen(true); }} sx={{ bgcolor: alpha('#EF4444', 0.1) }}><DeleteIcon fontSize="small" /></IconButton>
                     </Stack>
                   </Stack>
@@ -182,7 +189,7 @@ export default function CarsPage() {
                   <TableCell><Typography fontWeight={900} color="#293D91">€{car.pricePerDay}</Typography></TableCell>
                   <TableCell><Chip label={car.status} size="small" sx={{ fontWeight: 800, bgcolor: car.status === 'AVAILABLE' ? '#DCFCE7' : '#FEE2E2', color: car.status === 'AVAILABLE' ? '#166534' : '#991B1B' }} /></TableCell>
                   <TableCell align="right">
-                    <IconButton size="small" onClick={() => router.push(`/admin/cars/${car.id}/edit`)}><EditIcon fontSize="small" /></IconButton>
+                    <IconButton size="small" onClick={() => router.push(`/admin/cars/${car.id}`)}><EditIcon fontSize="small" /></IconButton>
                     <IconButton size="small" color="error" onClick={() => { setSelectedCar({ id: car.id, name: car.model.name }); setDeleteDialogOpen(true); }}><DeleteIcon fontSize="small" /></IconButton>
                   </TableCell>
                 </TableRow>
