@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Box, Container, Typography, Grid, Paper, TextField, InputAdornment, Button, Stack } from '@mui/material';
 import Image from 'next/image';
+import SafeImage from '@/components/SafeImage';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
@@ -10,7 +11,7 @@ export default function HeroSection() {
   return (
     <Box sx={{ position: 'relative', minHeight: '85vh', display: 'flex', alignItems: 'center', py: { xs: 10, md: 0 } }}>
       <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: -1 }}>
-        <Image src="/images/home/hero-main.jpg" alt="Hero" fill style={{ objectFit: 'cover', filter: 'brightness(0.4)' }} priority />
+        <SafeImage src="/images/home/hero-main.png" alt="Hero" fill style={{ objectFit: 'cover', filter: 'brightness(0.4)' }} priority fallback={'/images/home/hero-main.png'} />
       </Box>
 
       <Container maxWidth="xl">

@@ -124,9 +124,30 @@ export default function EditCarPage() {
       await updateCar({ variables: { id: carId, input: updateInput } });
 
       if (selectedImages.length > 0) {
-        await uploadCarImages({ 
-          variables: { input: { carId, images: selectedImages, primaryIndex: existingImages.length === 0 ? 0 : -1 } } 
-        });
+        const uploaded: string[] = [];
+        try {
+          for (let i = 0; i < selectedImages.length; i++) {
+            const file = selectedImages[i];
+            const isPrimary = existingImages.length === 0 && i === 0;
+            const res = await uploadCarImages({ variables: { carId, file, isPrimary } });
+            const added = res?.data?.addCarImage;
+            if (added) {
+              setExistingImages(prev => [...prev, added]);
+              uploaded.push(added.id);
+            }
+          }
+          // clear selected images after successful upload
+          setSelectedImages([]);
+          setImagePreviews([]);
+        } catch (err: any) {
+          // Rollback: delete images we just uploaded
+          if (uploaded.length > 0) {
+            try { await Promise.all(uploaded.map(id => deleteCarImage({ variables: { imageId: id } }))); } catch (e) { console.error('Failed to rollback uploaded images', e); }
+          }
+          setAlert({ open: true, msg: err?.message || 'Image upload failed; changes partially rolled back.', severity: 'error' });
+          setIsUpdating(false);
+          return;
+        }
       }
       setAlert({ open: true, msg: 'Car updated successfully!', severity: 'success' });
       router.push('/admin/cars');
@@ -280,7 +301,7 @@ export default function EditCarPage() {
                     {existingImages.map((img) => (
                       <Grid item xs={3} key={img.id}>
                         <Box sx={{ position: 'relative', height: 80, borderRadius: 2, overflow: 'hidden', border: '1px solid #E2E8F0' }}>
-                          <img src={`http://localhost:4000${img.imagePath}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={img.imagePath} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           <IconButton onClick={() => handleRemoveExistingImage(img.id)} size="small" sx={{ position: 'absolute', top: 2, right: 2, bgcolor: 'rgba(255,0,0,0.7)', color: 'white' }}>
                             <DeleteIcon sx={{ fontSize: 14 }} />
                           </IconButton>

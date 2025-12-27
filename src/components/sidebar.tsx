@@ -10,7 +10,9 @@ import {
   BrandingWatermark, Settings, Logout, ChevronLeft, Menu as MenuIcon 
 } from '@mui/icons-material';
 import { usePathname, useRouter } from 'next/navigation';
-import { useQuery } from '@apollo/client';
+import { useQuery, useApolloClient } from '@apollo/client';
+import { deleteCookie } from 'cookies-next';
+import { signOut } from 'next-auth/react';
 import { GET_PLATFORM_SETTINGS_QUERY } from '@/lib/graphql/queries'; // உன்னுடைய குவெரி
 
 const drawerWidth = 260;
@@ -32,12 +34,22 @@ export default function AdminSidebar() {
   // 🌍 லோகோ மற்றும் கம்பெனி பெயரை டைனமிக் ஆக எடுக்கிறோம்
   const { data } = useQuery(GET_PLATFORM_SETTINGS_QUERY);
   const settings = data?.platformSettings;
+  const client = useApolloClient();
 
   const handleToggle = () => setOpen(!open);
 
-  const handleLogout = () => {
-    localStorage.clear();
-    router.push('/login');
+  const handleLogout = async () => {
+    try {
+      // Remove cookie fallback token (if any), clear local storage and Apollo cache, then sign out NextAuth
+      deleteCookie('token');
+      localStorage.clear();
+      await client.clearStore();
+      await signOut({ callbackUrl: '/login' });
+    } catch (err) {
+      console.error('Logout failed:', err);
+      // Ensure navigation happens even if signOut fails
+      router.push('/login');
+    }
   };
 
   return (
