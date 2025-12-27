@@ -9,7 +9,7 @@ import { DirectionsCar, Euro, PhotoCamera, Save, CloudUpload } from '@mui/icons-
 import { useMutation, useQuery } from '@apollo/client';
 import { useRouter } from 'next/navigation';
 
-import { CREATE_CAR_MUTATION, ADD_CAR_IMAGE_MUTATION } from '@/lib/graphql/mutations';
+import { CREATE_CAR_MUTATION, ADD_CAR_IMAGE_MUTATION, DELETE_CAR_MUTATION } from '@/lib/graphql/mutations';
 import { GET_CAR_ENUMS, GET_BRANDS_QUERY, GET_MODELS_QUERY, GET_CARS_QUERY } from '@/lib/graphql/queries';
 
 export default function AddCarPage() {
@@ -44,6 +44,7 @@ export default function AddCarPage() {
     refetchQueries: [{ query: GET_CARS_QUERY }] 
   });
   const [uploadImage] = useMutation(ADD_CAR_IMAGE_MUTATION);
+  const [deleteCar] = useMutation(DELETE_CAR_MUTATION);
 
   const handleInputChange = (e: any) => {
     const { name, value } = e.target;
@@ -82,15 +83,26 @@ export default function AddCarPage() {
       // 2. Cloudinary-க்கு படங்களை அப்லோட் செய்தல்
       if (carId && selectedImages.length > 0) {
         setAlert({ open: true, msg: 'Uploading images to Cloudinary...', severity: 'info' });
-        const uploadPromises = selectedImages.map((file, index) => {
-          return uploadImage({
-            variables: { carId, file, isPrimary: index === 0 }
-          });
-        });
-        await Promise.all(uploadPromises);
+        const uploadedIds: string[] = [];
+        try {
+          for (let i = 0; i < selectedImages.length; i++) {
+            const file = selectedImages[i];
+            const res = await uploadImage({ variables: { carId, file, isPrimary: i === 0 } });
+            const created = res?.data?.addCarImage;
+            if (created?.id) uploadedIds.push(created.id);
+          }
+          setAlert({ open: true, msg: 'Car and images added successfully!', severity: 'success' });
+        } catch (err: any) {
+          // Rollback: delete the created car (server will remove uploaded images too)
+          try { await deleteCar({ variables: { id: carId } }); } catch (rollbackErr) { console.error('Rollback delete failed', rollbackErr); }
+          const message = err?.message || 'Image upload failed; car creation rolled back.';
+          setAlert({ open: true, msg: message, severity: 'error' });
+          setLoading(false);
+          return;
+        }
+      } else {
+        setAlert({ open: true, msg: 'Car added successfully!', severity: 'success' });
       }
-
-      setAlert({ open: true, msg: 'Car added successfully!', severity: 'success' });
       setTimeout(() => router.push('/admin/cars'), 1500);
 
     } catch (e: any) {

@@ -5,8 +5,6 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Link from 'next/link';
-
-// Components இம்போர்ட் செய்கிறோம்
 import HeroSection from '@/components/home/HeroSection';
 import TrustBadges from '@/components/home/TrustBadges';
 import AIFeature from '@/components/home/AIFeature';

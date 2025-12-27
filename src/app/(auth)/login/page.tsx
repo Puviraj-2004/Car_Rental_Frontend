@@ -25,6 +25,9 @@ const COLORS = {
 
 export default function UserLoginPage() {
   const router = useRouter();
+  const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+  const redirectUrl = searchParams.get('redirect') || searchParams.get('callbackUrl') || '/';
+
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -50,7 +53,10 @@ export default function UserLoginPage() {
       const session = await getSession();
       const userRole = (session?.user as any)?.role;
 
-      if (userRole === "ADMIN") {
+      // Redirect to the intended page or role-based default
+      if (redirectUrl && redirectUrl !== '/' && redirectUrl.startsWith('/')) {
+        router.push(redirectUrl);
+      } else if (userRole === "ADMIN") {
         router.push('/admin/dashboard');
       } else {
         router.push('/');
@@ -61,7 +67,7 @@ export default function UserLoginPage() {
 
   // Handle Google Login
   const handleGoogleLogin = () => {
-    signIn('google', { callbackUrl: '/' });
+    signIn('google', { callbackUrl: redirectUrl });
   };
 
   const inputStyles = {

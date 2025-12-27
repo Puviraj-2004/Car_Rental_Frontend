@@ -3,6 +3,7 @@
 import React from 'react';
 import { Box, Container, Grid, Typography, Card, CardContent, Button, Skeleton } from '@mui/material';
 import Image from 'next/image';
+import SafeImage from '@/components/SafeImage';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@apollo/client';
 import { GET_CARS_QUERY } from '@/lib/graphql/queries';
@@ -60,11 +61,12 @@ export default function FeaturedCars() {
                   '&:hover': { transform: 'translateY(-10px)', bgcolor: 'rgba(255,255,255,0.07)' }
                 }}>
                   <Box sx={{ position: 'relative', height: '240px' }}>
-                    <Image 
-                      src={car.images?.find((img: any) => img.isPrimary)?.imagePath || '/images/cars/placeholder.jpg'} 
-                      alt={car.model.name} 
+                    <SafeImage 
+                      src={car.images?.find((img: any) => img.isPrimary)?.imagePath || '/images/cars/placeholder.png'} 
+                      alt={car.model?.name || car.brand?.name || 'Car'} 
                       fill 
                       style={{ objectFit: 'cover' }} 
+                      fallback={'/images/cars/placeholder.png'}
                     />
                   </Box>
                   <CardContent sx={{ p: 3, textAlign: 'center' }}>
