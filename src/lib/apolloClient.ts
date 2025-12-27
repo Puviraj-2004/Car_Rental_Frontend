@@ -13,7 +13,6 @@ const errorLink = onError(({ graphQLErrors, networkError }) => {
   }
 });
 
-// ✅ createUploadLink இப்போது வேலை செய்யும்
 const uploadLink = createUploadLink({
   uri: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql',
   headers: { 
@@ -44,7 +43,28 @@ const authLink = setContext(async (_, { headers }) => {
 
 const client = new ApolloClient({
   link: from([errorLink, authLink, uploadLink]),
-  cache: new InMemoryCache(),
+  cache: new InMemoryCache({
+    typePolicies: {
+      Query: {
+        fields: {
+          cars: {
+            merge(existing, incoming) {
+              return incoming;
+            },
+          },
+        },
+      },
+    },
+  }),
+  defaultOptions: {
+    watchQuery: {
+      fetchPolicy: 'cache-and-network', 
+      nextFetchPolicy: 'cache-first',  
+    },
+    query: {
+      fetchPolicy: 'cache-first',
+    },
+  },
 });
 
 export default client;

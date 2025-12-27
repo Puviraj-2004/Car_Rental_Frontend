@@ -38,11 +38,17 @@ export default function CarsPage() {
     fuelType: undefined as string | undefined,
     transmission: undefined as string | undefined,
     status: undefined as string | undefined,
-    critAirRating: undefined as string | undefined
+    critAirRating: undefined as string | undefined,
+    includeOutOfService: true
   });
 
   const { loading, error, data, refetch } = useQuery(GET_CARS_QUERY, {
-    variables: { filter: filters },
+    variables: {
+      filter: {
+        ...filters,
+        includeOutOfService: true // Admin should see ALL cars including OUT_OF_SERVICE
+      }
+    },
     fetchPolicy: 'cache-and-network'
   });
 
@@ -62,9 +68,10 @@ export default function CarsPage() {
   });
 
   const resetFilters = () => {
-    setFilters({ 
-      brandId: '', modelId: '', fuelType: undefined, 
-      transmission: undefined, status: undefined, critAirRating: undefined 
+    setFilters({
+      brandId: '', modelId: '', fuelType: undefined,
+      transmission: undefined, status: undefined, critAirRating: undefined,
+      includeOutOfService: true
     });
   };
 

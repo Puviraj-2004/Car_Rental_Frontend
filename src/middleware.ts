@@ -13,8 +13,8 @@ export default withAuth(
     }
 
     const authPages = ["/login", "/register"];
-    if ((authPages.includes(pathname) || pathname === "/") && token) {
-      const redirectUrl = userRole === "ADMIN" ? "/admin/dashboard" : "/dashboard";
+    if (authPages.includes(pathname) && token) {
+      const redirectUrl = userRole === "ADMIN" ? "/admin/dashboard" : "/";
       return NextResponse.redirect(new URL(redirectUrl, req.url));
     }
 

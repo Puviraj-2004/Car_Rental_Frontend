@@ -44,11 +44,11 @@ export default function AdminSidebar() {
       deleteCookie('token');
       localStorage.clear();
       await client.clearStore();
-      await signOut({ callbackUrl: '/login' });
+      await signOut({ callbackUrl: '/' });
     } catch (err) {
       console.error('Logout failed:', err);
       // Ensure navigation happens even if signOut fails
-      router.push('/login');
+      router.push('/');
     }
   };
 
