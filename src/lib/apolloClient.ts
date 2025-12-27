@@ -5,11 +5,21 @@ import { createUploadLink } from 'apollo-upload-client';
 import { getCookie } from 'cookies-next';
 import { getSession } from 'next-auth/react';
 
-const errorLink = onError(({ graphQLErrors, networkError }) => {
+const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
   if (graphQLErrors) {
-    graphQLErrors.forEach(({ message, path }) =>
-      console.log(`[GraphQL error]: Message: ${message}, Path: ${path}`)
-    );
+    graphQLErrors.forEach(({ message, path, extensions }) => {
+      console.log(`[GraphQL error]: Message: ${message}, Path: ${path}, Extensions:`, extensions);
+      
+      // Log authentication errors specifically
+      if (extensions?.code === 'UNAUTHENTICATED' || extensions?.http?.status === 401) {
+        console.error('Authentication failed for operation:', operation.operationName);
+        console.error('Current token:', token ? 'Present' : 'Missing');
+      }
+    });
+  }
+  
+  if (networkError) {
+    console.error('[Network error]:', networkError);
   }
 });
 
@@ -32,6 +42,8 @@ const authLink = setContext(async (_, { headers }) => {
   if (!token) {
     token = getCookie('token');
   }
+  
+  console.log('Auth token check:', token ? 'Token found' : 'No token found');
   
   return {
     headers: {

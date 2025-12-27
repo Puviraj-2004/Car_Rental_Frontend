@@ -26,8 +26,8 @@ export default function AddCarPage() {
   const [formData, setFormData] = useState({
     brandId: '', modelId: '', year: new Date().getFullYear(),
     plateNumber: '', fuelType: '', transmission: '',
-    seats: 5, pricePerHour: 0, pricePerKm: 0, pricePerDay: 0,
-    depositAmount: 0, 
+    seats: 5, pricePerHour: '', pricePerKm: '', pricePerDay: '',
+    depositAmount: '', 
     critAirRating: '', status: 'AVAILABLE', descriptionEn: '', descriptionFr: ''
   });
 
@@ -51,6 +51,14 @@ export default function AddCarPage() {
     setFormData(prev => ({ 
       ...prev, 
       [name]: ['year', 'seats', 'pricePerHour', 'pricePerKm', 'pricePerDay', 'depositAmount'].includes(name) ? Number(value) : value 
+    }));
+  };
+
+  const handleCritAirChange = (e: any) => {
+    const { value } = e.target;
+    setFormData(prev => ({ 
+      ...prev, 
+      critAirRating: value === "" ? null : value
     }));
   };
 
@@ -182,8 +190,9 @@ export default function AddCarPage() {
               <Grid item xs={6} md={4}>
                 <FormControl fullWidth size="small">
                   <InputLabel>CritAir</InputLabel>
-                  <Select name="critAirRating" value={formData.critAirRating} label="CritAir" onChange={handleInputChange}>
-                    {enumData?.critAirEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>)}
+                  <Select name="critAirRating" value={formData.critAirRating || ""} label="CritAir" onChange={handleCritAirChange}>
+                    <MenuItem value="">None</MenuItem>
+                    {enumData?.critAirEnum?.enumValues.map((e: any) => (<MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>))}
                   </Select>
                 </FormControl>
               </Grid>
