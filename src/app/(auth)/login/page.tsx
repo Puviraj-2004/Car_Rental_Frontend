@@ -41,7 +41,7 @@ export default function UserLoginPage() {
 
     const result = await signIn('credentials', {
       redirect: false, // 👈 Manual redirection handling
-      email: formData.email,
+      email: formData.email.toLowerCase(),
       password: formData.password,
     });
 
@@ -68,6 +68,9 @@ export default function UserLoginPage() {
   // Handle Google Login
   const handleGoogleLogin = () => {
     signIn('google', { callbackUrl: redirectUrl });
+  };
+  const handleFacebookLogin = () => {
+    signIn('facebook', { callbackUrl: '/' });
   };
 
   const inputStyles = {
@@ -169,9 +172,11 @@ export default function UserLoginPage() {
                   <IconButton onClick={handleGoogleLogin} sx={{ border: '1px solid #E5E7EB', borderRadius: '12px', p: 1.2 }}>
                     <Google sx={{ color: '#EA4335' }} />
                   </IconButton>
-                  <IconButton sx={{ border: '1px solid #E5E7EB', borderRadius: '12px', p: 1.2 }}>
-                    <Facebook sx={{ color: '#1877F2' }} />
-                  </IconButton>
+                 <IconButton 
+                  onClick={handleFacebookLogin} 
+                  sx={{ border: '1px solid #E5E7EB', borderRadius: '12px', p: 1.2 }}>
+                  <Facebook sx={{ color: '#1877F2' }} />
+                </IconButton>
                 </Stack>
 
                 <Typography variant="body2" textAlign="center" sx={{ mt: 3 }}>
