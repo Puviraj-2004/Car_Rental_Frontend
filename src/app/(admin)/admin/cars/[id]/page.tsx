@@ -280,7 +280,7 @@ export default function EditCarPage() {
                     {existingImages.map((img) => (
                       <Grid item xs={3} key={img.id}>
                         <Box sx={{ position: 'relative', height: 80, borderRadius: 2, overflow: 'hidden', border: '1px solid #E2E8F0' }}>
-                          <img src={`http://localhost:4000${img.imagePath}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={img.imagePath} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           <IconButton onClick={() => handleRemoveExistingImage(img.id)} size="small" sx={{ position: 'absolute', top: 2, right: 2, bgcolor: 'rgba(255,0,0,0.7)', color: 'white' }}>
                             <DeleteIcon sx={{ fontSize: 14 }} />
                           </IconButton>
