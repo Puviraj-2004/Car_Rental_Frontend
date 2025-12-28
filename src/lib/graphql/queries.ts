@@ -28,6 +28,26 @@ export const GET_ME_QUERY = gql`
   }
 `;
 
+export const GET_BOOKING_BY_ID_QUERY = gql`
+  query GetBookingById($id: ID!) {
+    booking(id: $id) {
+      id
+      startDate
+      endDate
+      totalPrice
+      status
+      car {
+        brand { name }
+        model { name }
+        images { 
+          imagePath 
+          isPrimary
+        }
+      }
+    }
+  }
+`;
+
 export const GET_MY_BOOKINGS_QUERY = gql`
   query GetMyBookings {
     myBookings {

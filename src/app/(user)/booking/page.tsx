@@ -133,7 +133,7 @@ export default function BookingPage() {
 
   // --- 8. Handle Final Booking ---
   const handleConfirmBooking = async () => {
-    if (!priceDetails || availabilityError) return;
+    if (!priceDetails || availabilityError || !session?.user?.id) return;
 
     try {
       const { data: bData } = await createBooking({
@@ -146,7 +146,10 @@ export default function BookingPage() {
             taxAmount: priceDetails.taxAmount,
             surchargeAmount: priceDetails.totalSurcharge,
             totalPrice: priceDetails.totalPrice,
-            rentalType: 'DAY'
+            rentalType: 'DAY',
+            userId: session.user.id,
+            depositAmount: priceDetails.deposit
+           
           }
         }
       });
@@ -264,7 +267,7 @@ export default function BookingPage() {
               variant="contained" 
               size="large" 
               onClick={handleConfirmBooking}
-              disabled={availabilityError || bookingLoading}
+              disabled={!session || availabilityError || bookingLoading}
               sx={{ mt: 4, py: 2, borderRadius: 3, fontWeight: 900, fontSize: 16, textTransform: 'none', boxShadow: '0 10px 15px -3px rgba(37, 99, 235, 0.4)' }}
             >
               {bookingLoading ? <CircularProgress size={24} color="inherit" /> : 'Confirm Reservation'}

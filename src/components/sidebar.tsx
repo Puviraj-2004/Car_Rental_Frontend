@@ -14,7 +14,6 @@ import { useQuery, useApolloClient } from '@apollo/client';
 import { deleteCookie } from 'cookies-next';
 import { signOut } from 'next-auth/react';
 import { GET_PLATFORM_SETTINGS_QUERY } from '@/lib/graphql/queries'; // உன்னுடைய குவெரி
-import { signOut } from 'next-auth/react';
 
 const drawerWidth = 260;
 const collapsedWidth = 80;
@@ -22,7 +21,7 @@ const collapsedWidth = 80;
 const menuItems = [
   { text: 'Dashboard', icon: <Dashboard />, path: '/admin/dashboard' },
   { text: 'Cars Management', icon: <DirectionsCar />, path: '/admin/cars' },
-  { text: 'Bookings', icon: <BookOnline />, path: '/admin/bookings' },
+  { text: 'Bookings', icon: <BookOnline />, path: '/admin/booking' },
   { text: 'Inventory', icon: <BrandingWatermark />, path: '/admin/inventory' },
   { text: 'Users', icon: <People />, path: '/admin/users' },
 ];

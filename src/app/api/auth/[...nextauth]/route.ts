@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import FacebookProvider from "next-auth/providers/facebook"
+import { cookies } from 'next/headers';
 const handler = NextAuth({
   providers: [
     GoogleProvider({
@@ -92,6 +93,7 @@ const handler = NextAuth({
             token.accessToken = data.googleLogin.token;
             token.role = data.googleLogin.user.role;
             token.username = data.googleLogin.user.username;
+            token.id = data.googleLogin.user.id;
           }
         } catch (error) {
           console.error("NextAuth Google sync error:", error);
@@ -101,6 +103,7 @@ const handler = NextAuth({
       // --- 2. FACEBOOK LOGIC (NEW) ---
       if (account && account.provider === "facebook") {
         try {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/graphql";
           const res = await fetch(apiUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -113,7 +116,6 @@ const handler = NextAuth({
                   }
                 }
               `,
-              // Note: Facebook uses 'access_token', not 'id_token'
               variables: { accessToken: account.access_token } 
             })
           });
@@ -123,6 +125,7 @@ const handler = NextAuth({
             token.accessToken = data.facebookLogin.token;
             token.role = data.facebookLogin.user.role;
             token.username = data.facebookLogin.user.username;
+            token.id = data.facebookLogin.user.id;
           } else {
              console.error("Facebook Login failed at Backend:", data);
           }
@@ -131,7 +134,7 @@ const handler = NextAuth({
         }
       }
 
-      if (user) {
+      if (user?.accessToken) {
         token.accessToken = user.accessToken;
         token.role = user.role;
         token.username = user.username;

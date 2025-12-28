@@ -235,7 +235,7 @@ export default function Navbar() {
 
         <Divider />
 
-        <MenuItem onClick={() => { router.push('/bookings'); handleCloseUserMenu(); }}>
+                <MenuItem onClick={() => { router.push('/my-bookings'); handleCloseUserMenu(); }}>
           <ListItemText>My Bookings</ListItemText>
         </MenuItem>
 

@@ -11,9 +11,11 @@ const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
       console.log(`[GraphQL error]: Message: ${message}, Path: ${path}, Extensions:`, extensions);
       
       // Log authentication errors specifically
-      if (extensions?.code === 'UNAUTHENTICATED' || extensions?.http?.status === 401) {
+            if (
+        extensions?.code === 'UNAUTHENTICATED' ||
+        (extensions?.http as { status?: number })?.status === 401
+      ) {
         console.error('Authentication failed for operation:', operation.operationName);
-        console.error('Current token:', token ? 'Present' : 'Missing');
       }
     });
   }
@@ -31,25 +33,17 @@ const uploadLink = createUploadLink({
 });
 
 const authLink = setContext(async (_, { headers }) => {
-  let token = null;
-  try {
-    const session: any = await getSession();
-    token = session?.accessToken;
-  } catch (error) {
-    console.error('Error getting session:', error);
-  }
-  
-  if (!token) {
-    token = getCookie('token');
-  }
-  
-  console.log('Auth token check:', token ? 'Token found' : 'No token found');
-  
+  const session = await getSession();
+  // The type for session is augmented in `types/next-auth.d.ts`
+  const accessToken = session?.accessToken;
+
+  console.log('Auth token check (Final Attempt):', accessToken ? 'Token found' : 'No token found');
+
   return {
     headers: {
       ...headers,
-      authorization: token ? `Bearer ${token}` : "",
-    }
+      authorization: accessToken ? `Bearer ${accessToken}` : "",
+    },
   };
 });
 
