@@ -102,6 +102,9 @@ export const UPDATE_CAR_MUTATION = gql`
     updateCar(id: $id, input: $input) {
       id
       status
+      dailyKmLimit
+      extraKmCharge
+      currentMileage
       updatedAt
     }
   }
@@ -144,7 +147,55 @@ export const CREATE_BOOKING_MUTATION = gql`
       id
       status
       totalPrice
+      allowedKm
       depositAmount
+      bookingType
+      repairOrderId
+    }
+  }
+`;
+
+export const CONFIRM_BOOKING_MUTATION = gql`
+  mutation ConfirmBooking($bookingId: ID!) {
+    confirmBooking(bookingId: $bookingId) {
+      success
+      message
+      booking {
+        id
+        status
+        startDate
+        endDate
+        totalPrice
+        rentalType
+        bookingType
+        verification {
+          token
+          expiresAt
+        }
+      }
+    }
+  }
+`;
+
+export const RESEND_VERIFICATION_LINK_MUTATION = gql`
+  mutation ResendVerificationLink($bookingId: ID!) {
+    resendVerificationLink(bookingId: $bookingId) {
+      success
+      message
+      expiresAt
+    }
+  }
+`;
+
+export const CREATE_OR_UPDATE_DRIVER_PROFILE_MUTATION = gql`
+  mutation CreateOrUpdateDriverProfile($input: DriverProfileInput!) {
+    createOrUpdateDriverProfile(input: $input) {
+      id
+      licenseNumber
+      licenseExpiry
+      idNumber
+      dateOfBirth
+      status
     }
   }
 `;
@@ -180,6 +231,32 @@ export const UPDATE_BOOKING_STATUS_MUTATION = gql`
 export const CANCEL_BOOKING_MUTATION = gql`
   mutation CancelBooking($id: ID!) {
     cancelBooking(id: $id)
+  }
+`;
+
+// --- 📏 METER TRACKING & KM MANAGEMENT ---
+
+export const UPDATE_METER_READINGS_MUTATION = gql`
+  mutation UpdateMeterReadings($bookingId: ID!, $input: UpdateMeterReadingInput!) {
+    updateMeterReadings(bookingId: $bookingId, input: $input) {
+      id
+      startMeter
+      endMeter
+      status
+    }
+  }
+`;
+
+export const FINALIZE_BOOKING_RETURN_MUTATION = gql`
+  mutation FinalizeBookingReturn($bookingId: ID!) {
+    finalizeBookingReturn(bookingId: $bookingId) {
+      id
+      endMeter
+      extraKmUsed
+      extraKmCharge
+      totalFinalPrice
+      status
+    }
   }
 `;
 

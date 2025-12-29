@@ -25,14 +25,18 @@ const authLink = setContext(async (_, { headers }) => {
   try {
     const session: any = await getSession();
     token = session?.accessToken;
+    console.log('🔑 Apollo Auth - Session token:', token ? 'Found' : 'Not found');
   } catch (error) {
-    console.error('Error getting session:', error);
+    console.error('❌ Apollo Auth - Error getting session:', error);
   }
-  
+
   if (!token) {
     token = getCookie('token');
+    console.log('🍪 Apollo Auth - Cookie token:', token ? 'Found' : 'Not found');
   }
-  
+
+  console.log('🔐 Apollo Auth - Final token for request:', token ? `Bearer ${token.substring(0, 20)}...` : 'None');
+
   return {
     headers: {
       ...headers,

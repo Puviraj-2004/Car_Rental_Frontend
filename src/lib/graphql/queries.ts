@@ -32,25 +32,109 @@ export const GET_MY_BOOKINGS_QUERY = gql`
   query GetMyBookings {
     myBookings {
       id
+      createdAt
       startDate
       endDate
+
+      # Meter Tracking & KM Management
+      startMeter
+      endMeter
+      allowedKm
+      extraKmUsed
+      extraKmCharge
+
+      # Financials
       totalPrice
+      totalFinalPrice
+      basePrice
+      taxAmount
+      depositAmount
+      surchargeAmount
+
       status
       rentalType
+      bookingType
+      repairOrderId
       pickupLocation
       dropoffLocation
       car {
         brand { name }
         model { name }
         plateNumber
-        images { 
-          imagePath 
+        dailyKmLimit
+        extraKmCharge
+        images {
+          imagePath
           isPrimary
         }
       }
       payment {
         status
         amount
+      }
+      verification {
+        id
+        token
+        expiresAt
+        isVerified
+        verifiedAt
+      }
+    }
+  }
+`;
+
+export const GET_ALL_BOOKINGS_QUERY = gql`
+  query GetAllBookings {
+    bookings {
+      id
+      startDate
+      endDate
+
+      # Meter Tracking & KM Management
+      startMeter
+      endMeter
+      allowedKm
+      extraKmUsed
+      extraKmCharge
+
+      # Financials
+      totalPrice
+      totalFinalPrice
+      basePrice
+      taxAmount
+      depositAmount
+      surchargeAmount
+
+      status
+      rentalType
+      bookingType
+      repairOrderId
+      pickupLocation
+      dropoffLocation
+      user {
+        id
+        username
+        email
+        phoneNumber
+      }
+      car {
+        brand { name }
+        model { name }
+        plateNumber
+        dailyKmLimit
+        extraKmCharge
+        images {
+          imagePath
+          isPrimary
+        }
+      }
+      payment {
+        status
+        amount
+      }
+      verification {
+        isVerified
+        expiresAt
       }
     }
   }
@@ -69,10 +153,15 @@ export const GET_CARS_QUERY = gql`
       transmission
       seats
       mileage
+
+      # KM Limits & Meter Tracking
+      dailyKmLimit
+      extraKmCharge
+      currentMileage
+
       depositAmount
       pricePerDay
       pricePerHour
-      pricePerKm
       critAirRating
       status
       images {
@@ -97,9 +186,14 @@ export const GET_CAR_QUERY = gql`
       transmission
       seats
       mileage
+
+      # KM Limits & Meter Tracking
+      dailyKmLimit
+      extraKmCharge
+      currentMileage
+
       depositAmount
       pricePerHour
-      pricePerKm
       pricePerDay
       critAirRating
       status
@@ -189,6 +283,83 @@ export const GET_MODELS_QUERY = gql`
     models(brandId: $brandId) {
       id
       name
+    }
+  }
+`;
+
+export const GET_BOOKING_QUERY = gql`
+  query GetBooking($id: ID!) {
+    booking(id: $id) {
+      id
+      startDate
+      endDate
+
+      # Meter Tracking & KM Management
+      startMeter
+      endMeter
+      allowedKm
+      extraKmUsed
+      extraKmCharge
+
+      # Financials
+      totalPrice
+      totalFinalPrice
+      basePrice
+      taxAmount
+      depositAmount
+      surchargeAmount
+
+      status
+      rentalType
+      bookingType
+      repairOrderId
+      pickupLocation
+      dropoffLocation
+      car {
+        id
+        brand { name }
+        model { name }
+        plateNumber
+        fuelType
+        transmission
+        seats
+        dailyKmLimit
+        extraKmCharge
+        pricePerDay
+        pricePerHour
+        depositAmount
+        images {
+          imagePath
+          isPrimary
+        }
+      }
+      payment {
+        status
+        amount
+      }
+      verification {
+        id
+        token
+        expiresAt
+        isVerified
+        verifiedAt
+      }
+    }
+  }
+`;
+
+export const CHECK_CAR_AVAILABILITY_QUERY = gql`
+  query CheckCarAvailability($carId: ID!, $startDate: String!, $endDate: String!) {
+    checkCarAvailability(carId: $carId, startDate: $startDate, endDate: $endDate) {
+      available
+      conflictingBookings {
+        id
+        startDate
+        endDate
+        user {
+          username
+        }
+      }
     }
   }
 `;

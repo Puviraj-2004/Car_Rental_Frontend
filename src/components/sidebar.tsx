@@ -12,7 +12,6 @@ import {
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery, useApolloClient } from '@apollo/client';
 import { deleteCookie } from 'cookies-next';
-import { signOut } from 'next-auth/react';
 import { GET_PLATFORM_SETTINGS_QUERY } from '@/lib/graphql/queries'; // உன்னுடைய குவெரி
 import { signOut } from 'next-auth/react';
 

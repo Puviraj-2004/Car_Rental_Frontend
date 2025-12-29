@@ -2,8 +2,6 @@
 
 import React from 'react';
 import { Box, Container, Grid, Typography, Card, CardContent, Button, Skeleton } from '@mui/material';
-import Image from 'next/image';
-import SafeImage from '@/components/SafeImage';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@apollo/client';
 import { GET_CARS_QUERY } from '@/lib/graphql/queries';
@@ -52,22 +50,25 @@ export default function FeaturedCars() {
           ) : (
             featuredCars.map((car: any) => (
               <Grid item xs={12} sm={6} md={4} key={car.id}>
-                <Card sx={{ 
-                  bgcolor: 'rgba(255,255,255,0.03)', 
-                  color: 'white', 
-                  borderRadius: 4, 
+                <Card sx={{
+                  bgcolor: 'rgba(255,255,255,0.03)',
+                  color: 'white',
+                  borderRadius: 4,
                   border: '1px solid rgba(255,255,255,0.1)',
                   transition: '0.3s',
                   '&:hover': { transform: 'translateY(-10px)', bgcolor: 'rgba(255,255,255,0.07)' }
                 }}>
-                  <Box sx={{ position: 'relative', height: '240px' }}>
-                    <SafeImage 
-                      src={car.images?.find((img: any) => img.isPrimary)?.imagePath || '/images/cars/placeholder.png'} 
-                      alt={car.model?.name || car.brand?.name || 'Car'} 
-                      fill 
-                      style={{ objectFit: 'cover' }} 
-                      fallback={'/images/cars/placeholder.png'}
-                    />
+                  <Box sx={{
+                    height: '120px',
+                    bgcolor: 'rgba(255,255,255,0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '4px 4px 0 0'
+                  }}>
+                    <Typography variant="h6" sx={{ color: '#60A5FA', fontWeight: 'bold' }}>
+                      🚗
+                    </Typography>
                   </Box>
                   <CardContent sx={{ p: 3, textAlign: 'center' }}>
                     <Typography variant="caption" sx={{ color: '#60A5FA', fontWeight: 'bold', letterSpacing: 1 }}>

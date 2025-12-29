@@ -49,8 +49,17 @@ export default function UserLoginPage() {
       setError('Invalid email or password. Please try again.');
       setLoading(false);
     } else {
+      console.log('✅ Login successful, getting session...');
+
       // 🚀 லாகின் ஆன பிறகு செஷனை எடுத்து ரோலைச் சரிபார்க்கவும்
       const session = await getSession();
+      console.log('🔑 Session after login:', {
+        hasSession: !!session,
+        hasUser: !!session?.user,
+        userRole: (session?.user as any)?.role,
+        accessToken: session?.accessToken ? 'Present' : 'Missing'
+      });
+
       const userRole = (session?.user as any)?.role;
 
       // Redirect to the intended page or role-based default

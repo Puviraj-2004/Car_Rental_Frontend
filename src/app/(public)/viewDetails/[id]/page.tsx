@@ -1,0 +1,201 @@
+'use client';
+
+import React from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useQuery } from '@apollo/client';
+import {
+  Box, Grid, Typography, Stack, Chip, Divider, Button,
+  IconButton, Alert, Paper, CircularProgress, Container
+} from '@mui/material';
+import {
+  ArrowBack as ArrowBackIcon,
+  Settings as SettingsIcon,
+  LocalGasStation as FuelIcon,
+  EventSeat as SeatIcon,
+  Speed as SpeedIcon,
+  Verified as CritAirIcon,
+  Euro as EuroIcon,
+  Info as InfoIcon
+} from '@mui/icons-material';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import EventIcon from '@mui/icons-material/Event';
+import { GET_CAR_QUERY } from '@/lib/graphql/queries';
+
+export default function CarDetailsPage() {
+  const params = useParams();
+  const router = useRouter();
+  const carId = params.id as string;
+
+  const { data, loading, error } = useQuery(GET_CAR_QUERY, {
+    variables: { id: carId },
+    skip: !carId
+  });
+
+  if (loading) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 8, textAlign: 'center' }}>
+        <CircularProgress size={60} />
+        <Typography variant="h6" sx={{ mt: 2 }}>Loading car details...</Typography>
+      </Container>
+    );
+  }
+
+  if (error || !data?.car) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 8, textAlign: 'center' }}>
+        <Typography variant="h5" color="error">Car not found</Typography>
+        <Button onClick={() => router.back()} sx={{ mt: 2 }}>
+          Go Back
+        </Button>
+      </Container>
+    );
+  }
+
+  const car = data.car;
+
+  // 💰 Rental Type Filter Logic (Show only non-zero prices)
+  const pricingOptions = [
+    { label: 'Per Hour', value: car.pricePerHour, icon: <AccessTime /> },
+    { label: 'Per Day', value: car.pricePerDay, icon: <Event /> },
+    { label: 'Per Km', value: car.pricePerKm, icon: <SpeedIcon /> },
+  ].filter(option => option.value && option.value > 0);
+
+  return (
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box sx={{ position: 'relative' }}>
+        {/* 🔝 Header with Back Button */}
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
+          <Box>
+            <Typography variant="overline" color="primary" fontWeight={900} sx={{ letterSpacing: 2 }}>
+              {car.brand.name.toUpperCase()}
+            </Typography>
+            <Typography variant="h4" fontWeight={900}>
+              {car.model.name}
+            </Typography>
+          </Box>
+          <IconButton onClick={() => router.back()} sx={{ bgcolor: '#F1F5F9' }}>
+            <ArrowBackIcon />
+          </IconButton>
+        </Stack>
+
+      <Grid container spacing={4}>
+        {/* 📸 Image Section */}
+        <Grid item xs={12} md={7}>
+          <Box
+            sx={{
+              borderRadius: 4,
+              overflow: 'hidden',
+              height: { xs: 250, md: 400 },
+              bgcolor: '#F1F5F9',
+              position: 'relative'
+            }}
+          >
+            <img
+              src={car.images?.find((img: any) => img.isPrimary)?.imagePath || car.images?.[0]?.imagePath}
+              alt={car.model.name}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+            {/* CritAir Badge */}
+            <Chip
+              icon={<CritAirIcon sx={{ color: '#white !important' }} />}
+              label={car.critAirRating.replace('_', ' ')}
+              sx={{
+                position: 'absolute',
+                top: 16,
+                left: 16,
+                bgcolor: '#0F172A',
+                color: 'white',
+                fontWeight: 800
+              }}
+            />
+          </Box>
+        </Grid>
+
+        {/* 📋 Details Section */}
+        <Grid item xs={12} md={5}>
+          <Typography variant="h6" fontWeight={800} mb={2}>Key Specifications</Typography>
+          
+          <Grid container spacing={2} mb={3}>
+            <Grid item xs={6}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <SettingsIcon color="action" fontSize="small" />
+                <Typography variant="body2">{car.transmission}</Typography>
+              </Stack>
+            </Grid>
+            <Grid item xs={6}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <FuelIcon color="action" fontSize="small" />
+                <Typography variant="body2">{car.fuelType}</Typography>
+              </Stack>
+            </Grid>
+            <Grid item xs={6}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <SeatIcon color="action" fontSize="small" />
+                <Typography variant="body2">{car.seats} Seats</Typography>
+              </Stack>
+            </Grid>
+            <Grid item xs={6}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <SpeedIcon color="action" fontSize="small" />
+                <Typography variant="body2">{car.mileage} KM Mileage</Typography>
+              </Stack>
+            </Grid>
+          </Grid>
+
+          <Divider sx={{ my: 3 }} />
+
+          {/* 🏷️ Dynamic Pricing Section */}
+          <Typography variant="h6" fontWeight={800} mb={2}>Rental Pricing</Typography>
+          <Stack spacing={1.5} mb={4}>
+            {pricingOptions.map((option, index) => (
+              <Paper 
+                key={index} 
+                variant="outlined" 
+                sx={{ p: 1.5, borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderColor: '#E2E8F0' }}
+              >
+                <Typography variant="body2" fontWeight={700} color="text.secondary">{option.label}</Typography>
+                <Typography variant="subtitle1" fontWeight={900} color="primary">€{option.value}</Typography>
+              </Paper>
+            ))}
+          </Stack>
+
+          {/* Security Deposit Info */}
+          <Alert icon={<InfoIcon fontSize="inherit" />} severity="info" sx={{ mb: 4, borderRadius: 3 }}>
+            Refundable Deposit: <strong>€{car.depositAmount}</strong>
+          </Alert>
+
+          <Button
+            fullWidth
+            variant="contained"
+            size="large"
+            onClick={() => router.push(`/booking?carId=${car.id}`)}
+            sx={{
+              py: 2,
+              borderRadius: 3,
+              fontWeight: 900,
+              fontSize: 16,
+              bgcolor: '#0F172A',
+              '&:hover': { bgcolor: '#1E293B' }
+            }}
+          >
+            Book This Vehicle
+          </Button>
+        </Grid>
+
+        {/* 📝 Description Section */}
+        <Grid item xs={12}>
+          <Divider sx={{ mb: 3 }} />
+          <Typography variant="h6" fontWeight={800} mb={1}>Description</Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+            {car.descriptionEn || "This vehicle is well-maintained and perfect for your travel needs. Experience a smooth and comfortable ride with our premium fleet."}
+          </Typography>
+        </Grid>
+      </Grid>
+    </Box>
+    </Container>
+  );
+}
+
+// 📌 Icons used in logic
+function AccessTime() { return <AccessTimeIcon sx={{ fontSize: 18 }} />; }
+function Event() { return <EventIcon sx={{ fontSize: 18 }} />; }

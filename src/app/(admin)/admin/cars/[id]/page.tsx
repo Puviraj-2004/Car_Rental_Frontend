@@ -4,11 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
   Box, TextField, Button, Select, MenuItem, FormControl, InputLabel,
-  CircularProgress, Grid, Paper, Tab, Tabs, Snackbar, Alert, 
-  Stack, IconButton, Autocomplete, Switch, FormControlLabel, Typography, Divider
+  CircularProgress, Grid, Paper, Tab, Tabs, Snackbar, Alert,
+  Autocomplete, Typography, IconButton
 } from '@mui/material';
 import {
-  DirectionsCar, Euro, PhotoCamera, Save, Close, ArrowForward, 
+  DirectionsCar, Euro, PhotoCamera, Save,
   CloudUpload, Delete as DeleteIcon
 } from '@mui/icons-material';
 import { useMutation, useQuery } from '@apollo/client';
@@ -72,7 +72,7 @@ export default function EditCarPage() {
     const { name, value } = e.target;
     setFormData((prev: any) => ({
       ...prev,
-      [name]: ['year', 'seats', 'pricePerHour', 'pricePerKm', 'pricePerDay'].includes(name) ? Number(value) : value
+      [name]: ['year', 'seats', 'pricePerHour', 'pricePerDay', 'dailyKmLimit', 'extraKmCharge', 'currentMileage'].includes(name) ? (value === '' ? null : Number(value)) : value
     }));
   };
 
@@ -113,6 +113,10 @@ export default function EditCarPage() {
         pricePerHour: formData.pricePerHour,
         pricePerKm: formData.pricePerKm,
         pricePerDay: formData.pricePerDay,
+        // KM Limits & Meter Tracking
+        dailyKmLimit: formData.dailyKmLimit,
+        extraKmCharge: formData.extraKmCharge,
+        currentMileage: formData.currentMileage,
         critAirRating: formData.critAirRating,
         status: formData.status,
         descriptionEn: formData.descriptionEn,
@@ -198,138 +202,222 @@ export default function EditCarPage() {
   );
 
   return (
-    <Box sx={{ maxWidth: 900, mx: 'auto', p: 1 }}>
-      {/* Tab Header - Exactly like Add Page */}
-      <Paper elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3, mb: 2 }}>
-        <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="fullWidth">
-          <Tab icon={<DirectionsCar />} label="Identity" />
-          <Tab icon={<Euro />} label="Pricing" />
-          <Tab icon={<PhotoCamera />} label="Media" />
-        </Tabs>
-      </Paper>
+    <Box sx={{
+      height: { xs: 'auto', md: 'calc(100vh - 80px)' },
+      display: 'flex',
+      alignItems: { xs: 'flex-start', md: 'center' },
+      justifyContent: 'center',
+      p: { xs: 1, sm: 2 },
+      minHeight: { xs: '100vh', md: 'calc(100vh - 80px)' }
+    }}>
+      <Paper elevation={3} sx={{
+        width: '100%',
+        maxWidth: 900,
+        height: { xs: 'auto', md: '100%' },
+        maxHeight: { xs: 'none', md: 680 },
+        display: 'flex',
+        flexDirection: 'column',
+        borderRadius: 3,
+        overflow: 'hidden',
+        border: '1px solid #E2E8F0'
+      }}>
 
-      {/* Main Form Area */}
-      <Box sx={{ minHeight: 400 }}>
-        {activeTab === 0 && (
-          <Paper sx={{ p: 3, borderRadius: 3, border: '1px solid #E2E8F0' }}>
+        {/* TABS HEADER */}
+        <Box sx={{ bgcolor: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+          <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="fullWidth">
+            <Tab icon={<DirectionsCar fontSize="small" />} iconPosition="start" label="Identity" />
+            <Tab icon={<Euro fontSize="small" />} iconPosition="start" label="Pricing" />
+            <Tab icon={<PhotoCamera fontSize="small" />} iconPosition="start" label="Media" />
+          </Tabs>
+        </Box>
+
+        {/* FORM CONTENT */}
+        <Box sx={{ flex: 1, overflowY: 'auto', p: { xs: 2, sm: 4 } }}>
+          {activeTab === 0 && (
             <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} md={4}>
                 <Autocomplete
                   options={brandData?.brands || []}
                   getOptionLabel={(opt: any) => opt.name}
                   value={brandData?.brands.find((b: any) => b.id === formData.brandId) || null}
                   onChange={(_, newValue: any) => setFormData({ ...formData, brandId: newValue?.id || '', modelId: '' })}
-                  renderInput={(p) => <TextField {...p} label="Select Brand" size="small" required />}
+                  renderInput={(p) => <TextField {...p} label="Brand" size="small" required fullWidth />}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} md={4}>
                 <Autocomplete
                   disabled={!formData.brandId}
                   options={modelData?.models || []}
                   getOptionLabel={(opt: any) => opt.name}
                   value={modelData?.models.find((m: any) => m.id === formData.modelId) || null}
                   onChange={(_, newValue: any) => setFormData({ ...formData, modelId: newValue?.id || '' })}
-                  renderInput={(p) => <TextField {...p} label="Select Model" size="small" required />}
+                  renderInput={(p) => <TextField {...p} label="Model" size="small" required fullWidth />}
                 />
               </Grid>
-              <Grid item xs={6}><TextField fullWidth label="Year" name="year" type="number" value={formData.year} onChange={handleInputChange} size="small" /></Grid>
-              <Grid item xs={6}><TextField fullWidth label="Plate Number" name="plateNumber" value={formData.plateNumber} onChange={handleInputChange} size="small" /></Grid>
-              <Grid item xs={6}>
+              <Grid item xs={6} md={4}>
+                <TextField fullWidth label="Year" name="year" type="number" size="small" value={formData.year} onChange={handleInputChange} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField fullWidth label="Plate Number" name="plateNumber" size="small" required value={formData.plateNumber} onChange={handleInputChange} />
+              </Grid>
+              <Grid item xs={6} md={4}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Fuel</InputLabel>
-                  <Select name="fuelType" value={formData.fuelType} onChange={handleInputChange} label="Fuel">
+                  <Select name="fuelType" value={formData.fuelType} label="Fuel" onChange={handleInputChange}>
                     {enumData?.fuelTypeEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>)}
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={6}>
+              <Grid item xs={6} md={4}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Transmission</InputLabel>
-                  <Select name="transmission" value={formData.transmission} onChange={handleInputChange} label="Transmission">
+                  <Select name="transmission" value={formData.transmission} label="Transmission" onChange={handleInputChange}>
                     {enumData?.transmissionEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>)}
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={6}>
+              <Grid item xs={6} md={4}>
                 <FormControl fullWidth size="small">
-                  <InputLabel>CritAir Rating</InputLabel>
-                  <Select name="critAirRating" value={formData.critAirRating} onChange={handleInputChange} label="CritAir Rating">
-                    {enumData?.critAirEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>)}</Select>
+                  <InputLabel>CritAir</InputLabel>
+                  <Select name="critAirRating" value={formData.critAirRating} label="CritAir" onChange={handleInputChange}>
+                    {enumData?.critAirEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>)}
+                  </Select>
                 </FormControl>
               </Grid>
+              <Grid item xs={6} md={4}>
+                <TextField fullWidth label="Seats" name="seats" type="number" size="small" value={formData.seats} onChange={handleInputChange} />
+              </Grid>
             </Grid>
-          </Paper>
-        )}
+          )}
 
-        {activeTab === 1 && (
-          <Paper sx={{ p: 3, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#F8FAFC' }}>
-            <Grid container spacing={2}>
-              <Grid item xs={4}><TextField fullWidth size="small" label="Price/Hr (€)" name="pricePerHour" type="number" value={formData.pricePerHour} onChange={handleInputChange} /></Grid>
-              <Grid item xs={4}><TextField fullWidth size="small" label="Price/Day (€)" name="pricePerDay" type="number" value={formData.pricePerDay} onChange={handleInputChange} /></Grid>
-              <Grid item xs={4}><TextField fullWidth size="small" label="Price/Km (€)" name="pricePerKm" type="number" value={formData.pricePerKm} onChange={handleInputChange} /></Grid>
+          {activeTab === 1 && (
+            <Grid container spacing={3}>
+              <Grid item xs={4}>
+                <TextField fullWidth size="small" label="Per Hour (€)" name="pricePerHour" type="number" value={formData.pricePerHour} onChange={handleInputChange} />
+              </Grid>
+              <Grid item xs={4}>
+                <TextField fullWidth size="small" label="Per Day (€)" name="pricePerDay" type="number" value={formData.pricePerDay} onChange={handleInputChange} />
+              </Grid>
+              <Grid item xs={4}>
+                <TextField fullWidth size="small" label="Per Km (€)" name="pricePerKm" type="number" value={formData.pricePerKm} onChange={handleInputChange} />
+              </Grid>
+
+              {/* KM Limits & Meter Tracking Section */}
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: '#293D91' }}>
+                  🚗 KM Limits & Meter Tracking
+                </Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Daily KM Limit"
+                  name="dailyKmLimit"
+                  type="number"
+                  value={formData.dailyKmLimit ?? ''}
+                  onChange={handleInputChange}
+                  helperText="Leave empty for unlimited KM"
+                  InputProps={{
+                    endAdornment: formData.dailyKmLimit ? 'km/day' : null,
+                  }}
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Extra KM Charge (€)"
+                  name="extraKmCharge"
+                  type="number"
+                  value={formData.extraKmCharge ?? ''}
+                  onChange={handleInputChange}
+                  helperText="Cost per additional KM"
+                  InputProps={{
+                    startAdornment: '€',
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Current Mileage (km)"
+                  name="currentMileage"
+                  type="number"
+                  value={formData.currentMileage ?? ''}
+                  onChange={handleInputChange}
+                  helperText="Starting odometer reading"
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField fullWidth size="small" label="Security Deposit (€)" name="depositAmount" type="number" required value={formData.depositAmount} onChange={handleInputChange} helperText="Required for insurance franchise" />
+              </Grid>
               <Grid item xs={12}>
                 <FormControl fullWidth size="small">
-                  <InputLabel>Status</InputLabel>
-                  <Select name="status" value={formData.status} onChange={handleInputChange} label="Status">
-                    {enumData?.carStatusEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>)}</Select>
+                  <InputLabel>Availability Status</InputLabel>
+                  <Select name="status" value={formData.status} label="Availability Status" onChange={handleInputChange}>
+                    {enumData?.carStatusEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>)}
+                  </Select>
                 </FormControl>
               </Grid>
             </Grid>
-          </Paper>
-        )}
+          )}
 
-        {activeTab === 2 && (
-          <Paper sx={{ p: 3, borderRadius: 3, border: '1px solid #E2E8F0' }}>
-            <Box component="label" sx={{ height: 100, border: '2px dashed #CBD5E1', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#F8FAFC', cursor: 'pointer', mb: 2 }}>
-              <input hidden accept="image/*" multiple type="file" onChange={handleImageSelect} />
-              <CloudUpload color="primary" sx={{ mr: 1 }} /> Upload Images
-            </Box>
-            <Grid container spacing={1}>
-              {imagePreviews.map((p, i) => (
-                <Grid item xs={3} key={i}>
-                  <Box sx={{ position: 'relative', height: 80, borderRadius: 2, overflow: 'hidden', border: i === 0 ? '2px solid #293D91' : '1px solid #E2E8F0' }}>
-                    <img src={p} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  </Box>
-                </Grid>
-              ))}
-            </Grid>
-            {existingImages.length > 0 && (
-              <>
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="caption" sx={{ fontWeight: 700, mb: 1, display: 'block' }}>EXISTING GALLERY</Typography>
-                  <Grid container spacing={1}>
-                    {existingImages.map((img) => (
-                      <Grid item xs={3} key={img.id}>
-                        <Box sx={{ position: 'relative', height: 80, borderRadius: 2, overflow: 'hidden', border: '1px solid #E2E8F0' }}>
-                          <img src={img.imagePath} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          <IconButton onClick={() => handleRemoveExistingImage(img.id)} size="small" sx={{ position: 'absolute', top: 2, right: 2, bgcolor: 'rgba(255,0,0,0.7)', color: 'white' }}>
-                            <DeleteIcon sx={{ fontSize: 14 }} />
-                          </IconButton>
-                        </Box>
-                      </Grid>
-                    ))}
+          {activeTab === 2 && (
+            <Box sx={{ textAlign: 'center' }}>
+              <Box component="label" sx={{ height: 120, border: '2px dashed #CBD5E1', borderRadius: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', bgcolor: '#F8FAFC', cursor: 'pointer', '&:hover': { bgcolor: '#F1F5F9' }, mb: 3 }}>
+                <input hidden accept="image/*" multiple type="file" onChange={handleImageSelect} />
+                <CloudUpload sx={{ fontSize: 40, color: '#64748B', mb: 1 }} />
+                <Typography variant="body2" color="textSecondary">Click to Upload Photos</Typography>
+              </Box>
+              <Grid container spacing={1} sx={{ mb: 3 }}>
+                {imagePreviews.map((p, i) => (
+                  <Grid item xs={3} sm={2} key={i}>
+                    <Box sx={{ position: 'relative', height: 80, borderRadius: 2, overflow: 'hidden', border: i === 0 ? '2px solid #293D91' : '1px solid #E2E8F0' }}>
+                      <img src={p} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="car" />
+                      {i === 0 && <Box sx={{ position: 'absolute', bottom: 0, width: '100%', bgcolor: '#293D91', color: 'white', fontSize: '10px' }}>MAIN</Box>}
+                    </Box>
                   </Grid>
-                </Box>
-              </>
-            )}
-          </Paper>
-        )}
-      </Box>
+                ))}
+              </Grid>
+              {existingImages.length > 0 && (
+                <>
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, mb: 1, display: 'block' }}>EXISTING GALLERY</Typography>
+                    <Grid container spacing={1}>
+                      {existingImages.map((img) => (
+                        <Grid item xs={3} sm={2} key={img.id}>
+                          <Box sx={{ position: 'relative', height: 80, borderRadius: 2, overflow: 'hidden', border: '1px solid #E2E8F0' }}>
+                            <img src={img.imagePath} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="car" />
+                            <IconButton onClick={() => handleRemoveExistingImage(img.id)} size="small" sx={{ position: 'absolute', top: 2, right: 2, bgcolor: 'rgba(255,0,0,0.7)', color: 'white' }}>
+                              <DeleteIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                          </Box>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Box>
+                </>
+              )}
+            </Box>
+          )}
+        </Box>
 
-      <Stack direction="row" justifyContent="space-between" sx={{ mt: 2 }}>
-        <Button variant="outlined" onClick={() => router.push('/admin/cars')} startIcon={<Close />}>Cancel</Button>
-        {activeTab < 2 ? (
-          <Button variant="contained" onClick={() => setActiveTab(prev => prev + 1)} endIcon={<ArrowForward />}>Next</Button>
-        ) : (
-          <Button variant="contained" color="success" onClick={handleSubmit} disabled={isUpdating} startIcon={<Save />}>
-            {isUpdating ? "Updating..." : "Confirm & Update"}
+        {/* FOOTER */}
+        <Box sx={{ p: 2, borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+          <Button onClick={() => router.push('/admin/cars')} color="inherit">Cancel</Button>
+          <Button variant="contained" onClick={handleSubmit} disabled={isUpdating} startIcon={<Save />} sx={{ bgcolor: '#293D91' }}>
+            {isUpdating ? <CircularProgress size={20} color="inherit" /> : "Update Car"}
           </Button>
-        )}
+        </Box>
+      </Paper>
 
-      </Stack>
-
-      <Snackbar open={alert.open} autoHideDuration={3000} onClose={() => setAlert({ ...alert, open: false })}>
-        <Alert severity={alert.severity}>{alert.msg}</Alert>
+      <Snackbar open={alert.open} autoHideDuration={4000} onClose={() => setAlert({ ...alert, open: false })}>
+        <Alert severity={alert.severity} variant="filled" onClose={() => setAlert({ ...alert, open: false })}>
+          {alert.msg}
+        </Alert>
       </Snackbar>
     </Box>
   );

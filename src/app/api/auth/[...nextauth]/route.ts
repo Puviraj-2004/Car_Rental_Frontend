@@ -64,7 +64,16 @@ const handler = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user, account }: any) {
+      console.log('🔑 JWT Callback Start:', {
+        hasAccount: !!account,
+        accountProvider: account?.provider,
+        hasUser: !!user,
+        userAccessToken: user?.accessToken ? 'Present' : 'Missing',
+        tokenAccessToken: token?.accessToken ? 'Present' : 'Missing'
+      });
+
       if (account && account.provider === "google") {
+        console.log('🔵 Google login detected in JWT callback');
         try {
           const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/graphql";
           const res = await fetch(apiUrl, {
@@ -84,30 +93,65 @@ const handler = NextAuth({
           });
 
           const { data } = await res.json();
+          console.log('🔵 Google login response:', data?.googleLogin ? 'Success' : 'Failed');
+
           if (data?.googleLogin) {
             token.accessToken = data.googleLogin.token;
             token.role = data.googleLogin.user.role;
             token.username = data.googleLogin.user.username;
+            token.id = data.googleLogin.user.id;
+            console.log('✅ Google JWT token set:', {
+              hasToken: !!token.accessToken,
+              role: token.role,
+              id: token.id
+            });
           }
         } catch (error) {
-          console.error("NextAuth Google sync error:", error);
+          console.error("❌ NextAuth Google sync error:", error);
         }
       }
 
       if (user) {
-        token.accessToken = user.accessToken;
-        token.role = user.role;
-        token.username = user.username;
-        token.id = user.id;
+        console.log('👤 User object present, checking accessToken...');
+        // Only set values if not already set (e.g., from Google/Email login backend response)
+        if (!token.accessToken && user.accessToken) {
+          token.accessToken = user.accessToken;
+          console.log('📧 Email login: accessToken set from user object');
+        }
+        if (!token.role && user.role) {
+          token.role = user.role;
+        }
+        if (!token.username && user.username) {
+          token.username = user.username;
+        }
+        if (!token.id && user.id) {
+          token.id = user.id;
+        }
       }
+
+      console.log('🔑 JWT Callback End:', {
+        finalAccessToken: token?.accessToken ? 'Present' : 'Missing',
+        finalRole: token?.role,
+        finalId: token?.id
+      });
+
       return token;
     },
     async session({ session, token }: any) {
+      console.log('🔄 NextAuth Session Callback:', {
+        hasToken: !!token,
+        accessToken: token?.accessToken ? 'Present' : 'Missing',
+        tokenRole: token?.role,
+        sessionUser: !!session?.user,
+        tokenId: token?.id,
+        tokenEmail: token?.email
+      });
+
       if (token) {
         session.accessToken = token.accessToken;
         session.user.role = token.role;
         session.user.username = token.username;
-        session.user.id = token.id;
+        session.user.id = token.id || token.sub; // Use sub for Google users if id not set
       }
       return session;
     }

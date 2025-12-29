@@ -2,41 +2,17 @@
 
 import React, { useState } from 'react';
 import { Box, Container, Typography, Grid, Paper, TextField, InputAdornment, Button, Stack } from '@mui/material';
-import Image from 'next/image';
 import Link from 'next/link';
-import SafeImage from '@/components/SafeImage';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
 export default function HeroSection() {
   return (
-    <Box sx={{ position: 'relative', minHeight: '85vh', display: 'flex', alignItems: 'center', py: { xs: 10, md: 0 } }}>
-      <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: -1 }}>
-        <SafeImage src="/images/home/hero-main.png" alt="Hero" fill style={{ objectFit: 'cover', filter: 'brightness(0.4)' }} priority fallback={'/images/home/hero-main.png'} />
-      </Box>
+    <Box sx={{ position: 'relative', minHeight: '85vh', display: 'flex', alignItems: 'center', py: { xs: 10, md: 0 }, bgcolor: '#1a1a1a' }}>
 
       <Container maxWidth="xl">
         <Grid container spacing={4} alignItems="center">
-          <Grid item xs={12} md={7}>
-            {/* Hero Image */}
-            <Box sx={{ mb: 4, display: { xs: 'none', md: 'block' } }}>
-              <SafeImage
-                src="/images/home/herosection.jpg"
-                alt="Luxury Car"
-                width={500}
-                height={300}
-                style={{
-                  width: '100%',
-                  maxWidth: '500px',
-                  height: 'auto',
-                  borderRadius: 3,
-                  boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-                  transform: 'rotate(-2deg)',
-                }}
-                fallback="/images/home/placeholder.jpg"
-              />
-            </Box>
-
+          <Grid item xs={12} md={6}>
             <Typography variant="h1" sx={{ color: 'white', fontWeight: 900, fontSize: { xs: '2.8rem', md: '4.5rem' }, mb: 2 }}>
               Premium Drive. <br /> <span style={{ color: '#60A5FA' }}>Instant Access.</span>
             </Typography>
@@ -48,7 +24,7 @@ export default function HeroSection() {
             </Button>
           </Grid>
 
-          <Grid item xs={12} md={5}>
+          <Grid item xs={12} md={6}>
             <Paper elevation={24} sx={{ p: 4, borderRadius: 4, bgcolor: 'rgba(255, 255, 255, 0.98)' }}>
               <Typography variant="h5" fontWeight="bold" sx={{ mb: 3 }}>Ready to Book?</Typography>
               <Stack spacing={3}>

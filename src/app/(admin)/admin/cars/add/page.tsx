@@ -26,8 +26,12 @@ export default function AddCarPage() {
   const [formData, setFormData] = useState({
     brandId: '', modelId: '', year: new Date().getFullYear(),
     plateNumber: '', fuelType: '', transmission: '',
-    seats: 5, pricePerHour: 0, pricePerKm: 0, pricePerDay: 0,
-    depositAmount: 0, 
+    seats: 5, pricePerHour: 0, pricePerDay: 0,
+    depositAmount: 0,
+    // KM Limits & Meter Tracking
+    dailyKmLimit: null as number | null,
+    extraKmCharge: null as number | null,
+    currentMileage: 0,
     critAirRating: '', status: 'AVAILABLE', descriptionEn: '', descriptionFr: ''
   });
 
@@ -48,9 +52,9 @@ export default function AddCarPage() {
 
   const handleInputChange = (e: any) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ 
-      ...prev, 
-      [name]: ['year', 'seats', 'pricePerHour', 'pricePerKm', 'pricePerDay', 'depositAmount'].includes(name) ? Number(value) : value 
+    setFormData(prev => ({
+      ...prev,
+      [name]: ['year', 'seats', 'pricePerHour', 'pricePerDay', 'depositAmount', 'dailyKmLimit', 'extraKmCharge', 'currentMileage'].includes(name) ? (value === '' ? null : Number(value)) : value
     }));
   };
 
@@ -135,7 +139,7 @@ export default function AddCarPage() {
         </Box>
 
         {/* FORM CONTENT */}
-        <Box sx={{ flex: 1, overflowY: 'auto', p: 4 }}>
+        <Box sx={{ flex: 1, overflowY: 'auto', p: { xs: 2, sm: 4 } }}>
           {activeTab === 0 && (
             <Grid container spacing={2}>
               <Grid item xs={12} md={4}>
@@ -195,15 +199,63 @@ export default function AddCarPage() {
 
           {activeTab === 1 && (
             <Grid container spacing={3}>
-              <Grid item xs={4}>
+              <Grid item xs={6}>
                 <TextField fullWidth size="small" label="Per Hour (€)" name="pricePerHour" type="number" value={formData.pricePerHour} onChange={handleInputChange} />
               </Grid>
-              <Grid item xs={4}>
+              <Grid item xs={6}>
                 <TextField fullWidth size="small" label="Per Day (€)" name="pricePerDay" type="number" value={formData.pricePerDay} onChange={handleInputChange} />
               </Grid>
-              <Grid item xs={4}>
-                <TextField fullWidth size="small" label="Per Km (€)" name="pricePerKm" type="number" value={formData.pricePerKm} onChange={handleInputChange} />
+
+              {/* KM Limits & Meter Tracking Section */}
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: '#293D91' }}>
+                  🚗 KM Limits & Meter Tracking
+                </Typography>
               </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Daily KM Limit"
+                  name="dailyKmLimit"
+                  type="number"
+                  value={formData.dailyKmLimit || ''}
+                  onChange={handleInputChange}
+                  helperText="Leave empty for unlimited KM"
+                  InputProps={{
+                    endAdornment: formData.dailyKmLimit ? 'km/day' : null,
+                  }}
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Extra KM Charge (€)"
+                  name="extraKmCharge"
+                  type="number"
+                  value={formData.extraKmCharge || ''}
+                  onChange={handleInputChange}
+                  helperText="Cost per additional KM"
+                  InputProps={{
+                    startAdornment: '€',
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Current Mileage (km)"
+                  name="currentMileage"
+                  type="number"
+                  value={formData.currentMileage ?? ''}
+                  onChange={handleInputChange}
+                  helperText="Starting odometer reading"
+                  required
+                />
+              </Grid>
+
               <Grid item xs={12}>
                 <TextField fullWidth size="small" label="Security Deposit (€)" name="depositAmount" type="number" required value={formData.depositAmount} onChange={handleInputChange} helperText="Required for insurance franchise" />
               </Grid>
@@ -240,7 +292,7 @@ export default function AddCarPage() {
         </Box>
 
         {/* FOOTER */}
-        <Box sx={{ p: 2, borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+        <Box sx={{ p: { xs: 2, sm: 2 }, borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
           <Button onClick={() => router.back()} color="inherit">Cancel</Button>
           <Button variant="contained" onClick={handleSubmit} disabled={loading} startIcon={<Save />} sx={{ bgcolor: '#293D91' }}>
             {loading ? <CircularProgress size={20} color="inherit" /> : "Add Car"}

@@ -21,7 +21,7 @@ export default function Navbar() {
   const pathname = usePathname();
   const client = useApolloClient();
   const { data: session } = useSession();
-  const { data: userData } = useQuery(GET_ME_QUERY, { skip: !session });
+  const { data: userData } = useQuery(GET_ME_QUERY, { skip: !session?.accessToken });
   const { data: platformData } = useQuery(GET_PLATFORM_SETTINGS_QUERY);
   const settings = platformData?.platformSettings || {};
 
@@ -235,7 +235,7 @@ export default function Navbar() {
 
         <Divider />
 
-        <MenuItem onClick={() => { router.push('/bookings'); handleCloseUserMenu(); }}>
+        <MenuItem onClick={() => { router.push('/bookingRecords'); handleCloseUserMenu(); }}>
           <ListItemText>My Bookings</ListItemText>
         </MenuItem>
 
