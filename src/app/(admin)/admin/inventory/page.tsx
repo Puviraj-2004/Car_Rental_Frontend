@@ -47,7 +47,7 @@ export default function InventoryPage() {
   const [newName, setNewName] = useState('');
 
   // --- Handlers ---
-  const handleAdd = async () => {
+ const handleAdd = async () => {
     if (!newName) return;
     try {
       if (activeTab === 0) {
@@ -59,7 +59,17 @@ export default function InventoryPage() {
       }
       setNewName('');
       setAlert({ open: true, msg: 'Added Successfully!', severity: 'success' });
-    } catch (e: any) { setAlert({ open: true, msg: e.message, severity: 'error' }); }
+    } catch (e: any) {
+      console.error(e); // Keep logging for your own debugging
+      
+      // Check for duplicate/unique constraint errors
+      let errorMessage = e.message;
+      if (errorMessage.toLowerCase().includes('unique') || errorMessage.toLowerCase().includes('already exists')) {
+        errorMessage = `This ${activeTab === 0 ? 'Brand' : 'Model'} name already exists!`;
+      }
+
+      setAlert({ open: true, msg: errorMessage, severity: 'error' });
+    }
   };
 
   const handleOpenEdit = (id: string, name: string, type: 'BRAND' | 'MODEL') => {
@@ -84,7 +94,16 @@ export default function InventoryPage() {
       }
       setEditDialogOpen(false);
       setAlert({ open: true, msg: 'Updated Successfully!', severity: 'success' });
-    } catch (e: any) { setAlert({ open: true, msg: e.message, severity: 'error' }); }
+    } catch (e: any) {
+      let errorMessage = e.message;
+      
+      // Friendly duplicate error message
+      if (errorMessage.toLowerCase().includes('unique') || errorMessage.toLowerCase().includes('already exists')) {
+        errorMessage = `A ${selectedItem.type.toLowerCase()} with this name already exists.`;
+      }
+
+      setAlert({ open: true, msg: errorMessage, severity: 'error' });
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -122,11 +141,14 @@ export default function InventoryPage() {
                 </Select>
               </FormControl>
             )}
-            <TextField 
+           <TextField 
               label={activeTab === 0 ? "New Brand Name" : "New Model Name"} 
-              size="small" value={newName} 
+              size="small" 
+              value={newName} 
               onChange={(e) => setNewName(e.target.value)}
               disabled={activeTab === 1 && !selectedBrandId}
+              // Add this helper text:
+              helperText={activeTab === 1 && !selectedBrandId ? "Select a brand first" : ""}
             />
             <Button variant="contained" startIcon={<AddIcon />} onClick={handleAdd} disabled={activeTab === 1 && !selectedBrandId}>Add</Button>
           </Stack>

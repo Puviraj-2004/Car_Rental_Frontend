@@ -5,15 +5,18 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useQuery, useMutation } from '@apollo/client';
 import {
-  Box, Container, Typography, Paper, Grid, Button, TextField,
-  Card, CardContent, CardMedia, Stack, Divider, Alert,
+  Box, Container, Typography, Paper, Grid, Button,
+  Card, CardMedia, Stack, Divider, Alert,
   CircularProgress, Chip, Dialog, DialogTitle, DialogContent,
-  DialogActions, List, ListItem, ListItemText, ListItemIcon, Snackbar
+  DialogActions
 } from '@mui/material';
 import {
-  DirectionsCar, AccessTime, CheckCircle, Warning, Info,
-  Event, Schedule, Euro, VerifiedUser, Security, Settings, LocalGasStation
+  Schedule, CheckCircle, Warning, Security, Settings, LocalGasStation
 } from '@mui/icons-material';
+
+// 🗓️ NEW IMPORTS FOR DATE PICKER
+import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
 // GraphQL Queries & Mutations
 import { 
@@ -39,14 +42,10 @@ export default function BookingPage() {
   // --- 2. Local UI States ---
   const [verificationDialog, setVerificationDialog] = useState(false);
   const [availabilityError, setAvailabilityError] = useState(false);
-  const [showPriceWarning, setShowPriceWarning] = useState(false);
 
   // --- 3. Authentication & Redirect Logic ---
   useEffect(() => {
-    // Wait for authentication status to be determined
     if (status === 'loading') return;
-
-    // Redirect to login if not authenticated
     if (status === 'unauthenticated') {
       const currentUrl = window.location.pathname + window.location.search;
       router.push(`/login?redirect=${encodeURIComponent(currentUrl)}`);
@@ -67,24 +66,46 @@ export default function BookingPage() {
   const [createBooking, { loading: bookingLoading }] = useMutation(CREATE_BOOKING_MUTATION);
   const [sendVerification] = useMutation(SEND_VERIFICATION_LINK_MUTATION);
 
-  // --- 6. Availability Check (24h Buffer Logic) ---
+  // --- 6. Helper Function: Check Conflicts (Used for Visuals AND Logic) ---
+  const isDateBlocked = (date: Date) => {
+    if (!carData?.car?.bookings) return false;
+    
+    // Create timestamps for the start and end of the calendar day being checked
+    const dayStart = new Date(date).setHours(0, 0, 0, 0);
+    const dayEnd = new Date(date).setHours(23, 59, 59, 999);
+    
+    const BUFFER = 24 * 60 * 60 * 1000; // 24 Hour Buffer
+
+    return carData.car.bookings.some((booking: any) => {
+      const bStart = new Date(booking.startDate).getTime() - BUFFER;
+      const bEnd = new Date(booking.endDate).getTime() + BUFFER;
+      
+      // Return true if the day overlaps with any booking+buffer range
+      return (dayStart < bEnd && dayEnd > bStart);
+    });
+  };
+
+  // --- 7. Availability Check Effect (Safety Net) ---
   useEffect(() => {
-    if (carData?.car?.bookings && startDateTime && endDateTime) {
-      const userStart = new Date(startDateTime).getTime();
-      const userEnd = new Date(endDateTime).getTime();
-      const BUFFER = 24 * 60 * 60 * 1000; // 24 மணிநேர பஃபர்
+    if (startDateTime && endDateTime) {
+       // We re-use the logic to check if the specific selected times are valid
+       // This catches edge cases where user might select a time inside a partially blocked day
+       const userStart = new Date(startDateTime).getTime();
+       const userEnd = new Date(endDateTime).getTime();
+       const BUFFER = 24 * 60 * 60 * 1000;
 
-      const hasConflict = carData.car.bookings.some((booking: any) => {
-        const bStart = new Date(booking.startDate).getTime() - BUFFER;
-        const bEnd = new Date(booking.endDate).getTime() + BUFFER;
-        return (userStart < bEnd && userEnd > bStart);
-      });
+       const hasConflict = carData?.car?.bookings?.some((booking: any) => {
+          const bStart = new Date(booking.startDate).getTime() - BUFFER;
+          const bEnd = new Date(booking.endDate).getTime() + BUFFER;
+          return (userStart < bEnd && userEnd > bStart);
+       });
 
-      if (hasConflict) setAvailabilityError(true);
+       if (hasConflict) setAvailabilityError(true);
+       else setAvailabilityError(false);
     }
   }, [startDateTime, endDateTime, carData]);
 
-  // --- 7. Young Driver & Price Calculation Logic ---
+  // --- 8. Price Calculation Logic ---
   const priceDetails = useMemo(() => {
     if (!carData?.car || !startDateTime || !endDateTime || !platformData?.platformSettings) return null;
 
@@ -98,7 +119,6 @@ export default function BookingPage() {
     const diffTime = Math.abs(end.getTime() - start.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
 
-    // Young Driver / Novice Check
     let isYoung = false;
     let isNovice = false;
 
@@ -131,7 +151,7 @@ export default function BookingPage() {
     };
   }, [carData, startDateTime, endDateTime, platformData, userData]);
 
-  // --- 8. Handle Final Booking ---
+  // --- 9. Handle Final Booking ---
   const handleConfirmBooking = async () => {
     if (!priceDetails || availabilityError || !session?.user?.id) return;
 
@@ -149,7 +169,6 @@ export default function BookingPage() {
             rentalType: 'DAY',
             userId: session.user.id,
             depositAmount: priceDetails.deposit
-           
           }
         }
       });
@@ -206,14 +225,37 @@ export default function BookingPage() {
             <Typography variant="h6" fontWeight={800} mb={3} display="flex" alignItems="center">
               <Schedule sx={{ mr: 1, color: '#2563EB' }} /> Change Dates & Time
             </Typography>
-            <Grid container spacing={3}>
-              <Grid item xs={12} sm={6}>
-                <TextField fullWidth label="Pickup Date & Time" type="datetime-local" value={startDateTime} onChange={(e) => setStartDateTime(e.target.value)} InputLabelProps={{ shrink: true }} />
+            
+            {/* 🗓️ UPDATED: LocalizationProvider wraps the DatePickers */}
+            <LocalizationProvider dateAdapter={AdapterDateFns}>
+              <Grid container spacing={3}>
+                
+                {/* START TIME */}
+                <Grid item xs={12} sm={6}>
+                  <DateTimePicker
+                    label="Pickup Date & Time"
+                    value={startDateTime ? new Date(startDateTime) : null}
+                    onChange={(newValue) => setStartDateTime(newValue ? newValue.toISOString() : '')}
+                    shouldDisableDate={isDateBlocked} // <--- VISUAL BLOCKING
+                    disablePast
+                    slotProps={{ textField: { fullWidth: true } }}
+                  />
+                </Grid>
+
+                {/* END TIME */}
+                <Grid item xs={12} sm={6}>
+                  <DateTimePicker
+                    label="Return Date & Time"
+                    value={endDateTime ? new Date(endDateTime) : null}
+                    onChange={(newValue) => setEndDateTime(newValue ? newValue.toISOString() : '')}
+                    shouldDisableDate={isDateBlocked} // <--- VISUAL BLOCKING
+                    minDateTime={startDateTime ? new Date(startDateTime) : new Date()} // <--- CONSTRAINT: End > Start
+                    slotProps={{ textField: { fullWidth: true } }}
+                  />
+                </Grid>
+
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField fullWidth label="Return Date & Time" type="datetime-local" value={endDateTime} onChange={(e) => setEndDateTime(e.target.value)} InputLabelProps={{ shrink: true }} />
-              </Grid>
-            </Grid>
+            </LocalizationProvider>
 
             {priceDetails?.isYoung && (
               <Alert severity="warning" sx={{ mt: 3, borderRadius: 3, border: '1px solid #fed7aa' }}>
@@ -235,12 +277,12 @@ export default function BookingPage() {
                 <Typography fontWeight={700}>€{priceDetails?.basePrice.toFixed(2)}</Typography>
               </Box>
 
-              {priceDetails?.totalSurcharge && priceDetails.totalSurcharge > 0 && (
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography color="error.main" fontWeight={600}>Young/Novice Driver Fee</Typography>
-                  <Typography fontWeight={700} color="error.main">+ €{priceDetails.totalSurcharge.toFixed(2)}</Typography>
-                </Box>
-              )}
+              {priceDetails?.totalSurcharge ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography color="error.main" fontWeight={600}>Young/Novice Driver Fee</Typography>
+                    <Typography fontWeight={700} color="error.main">+ €{priceDetails.totalSurcharge.toFixed(2)}</Typography>
+                  </Box>
+              ) : null}
 
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Typography color="text.secondary" fontWeight={500}>VAT ({platformData?.platformSettings?.taxPercentage}%)</Typography>
@@ -294,7 +336,7 @@ export default function BookingPage() {
         </DialogActions>
       </Dialog>
 
-      {/* 🎉 Success & KYC Link Dialog */}
+      {/* 🎉 Success Dialog */}
       <Dialog open={verificationDialog} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 6, p: 2 } }}>
         <DialogContent sx={{ textAlign: 'center' }}>
           <Box sx={{ width: 80, height: 80, bgcolor: '#DCFCE7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 3 }}>
@@ -302,14 +344,13 @@ export default function BookingPage() {
           </Box>
           <Typography variant="h5" fontWeight={1000} gutterBottom>Booking Reserved!</Typography>
           <Typography color="text.secondary" mb={4}>
-            A magic verification link has been sent to your email. Please upload your documents (NIC/License) via that link to finalize your rental.
+            A magic verification link has been sent to your email. Please upload your documents via that link.
           </Typography>
-          <Button fullWidth variant="contained" onClick={() => router.push('/bookings')} sx={{ borderRadius: 3, py: 1.5, fontWeight: 900 }}>
+          <Button fullWidth variant="contained" onClick={() => router.push('/my-bookings')} sx={{ borderRadius: 3, py: 1.5, fontWeight: 900 }}>
             Go to My Bookings
           </Button>
         </DialogContent>
       </Dialog>
-
     </Container>
   );
 }
