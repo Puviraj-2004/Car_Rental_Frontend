@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { useMutation } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Box, Button, Typography, Paper, Grid, TextField, Alert,
@@ -17,11 +17,31 @@ import {
   NavigateNext as NavigateNextIcon,
   NavigateBefore as NavigateBeforeIcon
 } from '@mui/icons-material';
-import { CREATE_OR_UPDATE_DRIVER_PROFILE_MUTATION } from '@/lib/graphql/mutations';
+import { CREATE_OR_UPDATE_DRIVER_PROFILE_MUTATION, PROCESS_DOCUMENT_OCR_MUTATION } from '@/lib/graphql/mutations';
+import { GET_BOOKING_ID_BY_TOKEN_QUERY } from '@/lib/graphql/queries';
 
-export default function DriverVerificationPage() {
+interface DriverVerificationPageProps {
+  params: Promise<{
+    token: string;
+  }>;
+}
+
+export default function DriverVerificationPage({ params }: DriverVerificationPageProps) {
   const router = useRouter();
   const { data: session } = useSession();
+
+  // Unwrap params with React.use() (Next.js 15 requirement)
+  const resolvedParams = use(params);
+  const token = resolvedParams.token;
+
+  // Get booking ID from verification token
+  const { data: tokenData } = useQuery(GET_BOOKING_ID_BY_TOKEN_QUERY, {
+    variables: { token },
+    skip: !token
+  });
+
+  const bookingId = tokenData?.verifyBookingToken?.bookingId;
+
   const [currentStep, setCurrentStep] = useState(0); // Material-UI Stepper uses 0-based index
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
@@ -46,63 +66,62 @@ export default function DriverVerificationPage() {
   });
 
   const [createOrUpdateDriverProfile] = useMutation(CREATE_OR_UPDATE_DRIVER_PROFILE_MUTATION);
+  const [processDocumentOCR] = useMutation(PROCESS_DOCUMENT_OCR_MUTATION);
 
   const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 4000);
   };
 
-  const handleFileUpload = async (file: File, type: 'license' | 'cni' | 'address') => {
+  const handleFileUpload = async (file: File, type: 'license' | 'cni' | 'address', side?: 'front' | 'back') => {
     setIsLoading(true);
 
     try {
-      // Simulate AI processing with Mindee-like analysis
-      await new Promise(resolve => setTimeout(resolve, 2500));
-
-      if (type === 'license') {
-        // Simulate Mindee API response for license
-        const extractedData = {
-          name: 'John Doe',
-          licenseNumber: 'DL123456789',
-          expiryDate: '2025-12-31'
-        };
-
-        setLicenseData(prev => ({
-          ...prev,
-          name: extractedData.name,
-          licenseNumber: extractedData.licenseNumber,
-          expiryDate: extractedData.expiryDate
-        }));
-
-        showToast('License scanned successfully! Please verify the extracted information.', 'success');
-      } else if (type === 'cni') {
-        // Simulate Mindee API response for CNI
-        const extractedData = {
-          idNumber: '123456789012',
-          dateOfBirth: '1990-01-15'
-        };
-
-        setCniData(prev => ({
-          ...prev,
-          idNumber: extractedData.idNumber,
-          dateOfBirth: extractedData.dateOfBirth
-        }));
-
-        showToast('ID card scanned successfully! Please verify the extracted information.', 'success');
-      } else if (type === 'address') {
-        // Simulate document validation
-        const isRecent = Math.random() > 0.3; // 70% chance of being recent
-
-        if (!isRecent) {
-          showToast('This document appears to be older than 3 months. Please upload a more recent document.', 'warning');
-          setIsLoading(false);
-          return;
+      // Call Mindee OCR API through backend
+      const { data } = await processDocumentOCR({
+        variables: {
+          file,
+          documentType: type,
+          side: side
         }
+      });
 
-        showToast('Address proof validated successfully!', 'success');
+      if (data?.processDocumentOCR) {
+        const extractedData = data.processDocumentOCR;
+
+        if (type === 'license') {
+          setLicenseData(prev => ({
+            ...prev,
+            name: extractedData.fullName || prev.name,
+            licenseNumber: extractedData.documentId || prev.licenseNumber,
+            expiryDate: extractedData.expiryDate || prev.expiryDate
+          }));
+
+          showToast('License scanned successfully! Please verify the extracted information.', 'success');
+        } else if (type === 'cni') {
+          setCniData(prev => ({
+            ...prev,
+            idNumber: extractedData.documentId || prev.idNumber,
+            dateOfBirth: extractedData.birthDate || prev.dateOfBirth
+          }));
+
+          showToast('ID card scanned successfully! Please verify the extracted information.', 'success');
+        } else if (type === 'address') {
+          // For address proof, we mainly validate that OCR worked
+          const hasAddressData = extractedData.address || extractedData.fullName;
+
+          if (!hasAddressData) {
+            showToast('Could not extract clear information from this document. Please ensure it contains address details.', 'warning');
+          } else {
+            showToast('Address proof validated successfully!', 'success');
+          }
+        }
+      } else {
+        showToast('Failed to process document. Please try again.', 'error');
       }
-    } catch (error) {
-      showToast('Failed to process document. Please try again.', 'error');
+    } catch (error: any) {
+      console.error('OCR processing error:', error);
+      showToast(error.message || 'Failed to process document. Please try again.', 'error');
     }
 
     setIsLoading(false);
@@ -137,11 +156,16 @@ export default function DriverVerificationPage() {
       });
 
       if (data?.createOrUpdateDriverProfile) {
-        showToast('Driver verification submitted successfully! Redirecting...', 'success');
+        showToast('Driver verification completed successfully! Redirecting to payment...', 'success');
 
-        // Celebration animation
+        // Redirect to payment page with booking ID
         setTimeout(() => {
-          router.push('/');
+          if (bookingId) {
+            router.push(`/payment/${bookingId}`);
+          } else {
+            // Fallback if booking ID not available
+            router.push('/booking-records');
+          }
         }, 2000);
       }
     } catch (error: any) {
@@ -224,7 +248,7 @@ export default function DriverVerificationPage() {
                         const file = e.target.files?.[0];
                         if (file) {
                           setLicenseData(prev => ({ ...prev, frontFile: file }));
-                          handleFileUpload(file, 'license');
+                          handleFileUpload(file, 'license', 'front');
                         }
                       }}
                       style={{ display: 'none' }}
@@ -264,6 +288,7 @@ export default function DriverVerificationPage() {
                         const file = e.target.files?.[0];
                         if (file) {
                           setLicenseData(prev => ({ ...prev, backFile: file }));
+                          handleFileUpload(file, 'license', 'back');
                         }
                       }}
                       style={{ display: 'none' }}

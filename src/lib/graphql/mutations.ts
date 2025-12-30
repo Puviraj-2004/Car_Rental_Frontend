@@ -234,6 +234,18 @@ export const CANCEL_BOOKING_MUTATION = gql`
   }
 `;
 
+export const PROCESS_DOCUMENT_OCR_MUTATION = gql`
+  mutation ProcessDocumentOCR($file: Upload!, $documentType: String, $side: String) {
+    processDocumentOCR(file: $file, documentType: $documentType, side: $side) {
+      fullName
+      documentId
+      expiryDate
+      birthDate
+      address
+    }
+  }
+`;
+
 // --- 📏 METER TRACKING & KM MANAGEMENT ---
 
 export const UPDATE_METER_READINGS_MUTATION = gql`

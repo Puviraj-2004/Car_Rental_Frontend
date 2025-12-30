@@ -28,6 +28,7 @@ import { GET_MY_BOOKINGS_QUERY } from '@/lib/graphql/queries';
 import { RESEND_VERIFICATION_LINK_MUTATION, CANCEL_BOOKING_MUTATION } from '@/lib/graphql/mutations';
 import { format } from 'date-fns';
 import { formatUtcToLocalTime, getExpirationMessage, getRemainingMinutes, formatRemainingTime } from '@/lib/timeUtils';
+import { formatDateForDisplay, formatTimeForDisplay, formatDateTimeForDisplay } from '@/lib/dateUtils';
 
 export default function BookingRecordsPage() {
   const router = useRouter();
@@ -200,12 +201,22 @@ const BookingCard = ({ booking, onViewDetails }: any) => {
                 <DateIcon sx={{ fontSize: 12 }} />
                 {(() => {
                   try {
-                    const startDate = new Date(booking.startDate);
-                    const endDate = new Date(booking.endDate);
-                    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+                    const startDateStr = formatDateForDisplay(booking.startDate);
+                    const endDateStr = formatDateForDisplay(booking.endDate);
+
+                    if (startDateStr === 'Invalid Date' || endDateStr === 'Invalid Date') {
                       return 'Invalid dates';
                     }
-                    return `${format(startDate, 'MMM dd')} - ${format(endDate, 'MMM dd')}`;
+
+                    // Extract just the month and day part for compact display
+                    const startParts = startDateStr.split(' ');
+                    const endParts = endDateStr.split(' ');
+
+                    if (startParts.length >= 2 && endParts.length >= 2) {
+                      return `${startParts[1]} ${startParts[0]} - ${endParts[1]} ${endParts[0]}`;
+                    }
+
+                    return `${startDateStr} - ${endDateStr}`;
                   } catch (error) {
                     return 'Invalid dates';
                   }
@@ -588,13 +599,13 @@ const BookingDetailsModal = ({ open, onClose, booking }: any) => {
             <Box display="flex" justifyContent="space-between">
               <Typography variant="body2">Pickup Date</Typography>
               <Typography fontWeight={700}>
-                {new Date(booking.startDate).toLocaleDateString()}
+                {formatDateForDisplay(booking.startDate)}
               </Typography>
             </Box>
             <Box display="flex" justifyContent="space-between">
               <Typography variant="body2">Return Date</Typography>
               <Typography fontWeight={700}>
-                {new Date(booking.endDate).toLocaleDateString()}
+                {formatDateForDisplay(booking.endDate)}
               </Typography>
             </Box>
             <Box display="flex" justifyContent="space-between">

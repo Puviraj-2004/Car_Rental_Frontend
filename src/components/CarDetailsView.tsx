@@ -2,7 +2,7 @@
 
 import React from 'react';
 import {
-  Box, Grid, Typography, Stack, Chip, Divider, Button, 
+  Box, Grid, Typography, Stack, Chip, Divider, Button,
   IconButton, List, ListItem, ListItemIcon, ListItemText,
   Alert,
   Paper
@@ -89,7 +89,7 @@ export default function CarDetailsView({ car, onClose, onBook }: CarDetailsProps
         {/* 📋 Details Section */}
         <Grid item xs={12} md={5}>
           <Typography variant="h6" fontWeight={800} mb={2}>Key Specifications</Typography>
-          
+
           <Grid container spacing={2} mb={3}>
             <Grid item xs={6}>
               <Stack direction="row" spacing={1} alignItems="center">
@@ -123,9 +123,9 @@ export default function CarDetailsView({ car, onClose, onBook }: CarDetailsProps
           <Typography variant="h6" fontWeight={800} mb={2}>Rental Pricing</Typography>
           <Stack spacing={1.5} mb={4}>
             {pricingOptions.map((option, index) => (
-              <Paper 
-                key={index} 
-                variant="outlined" 
+              <Paper
+                key={index}
+                variant="outlined"
                 sx={{ p: 1.5, borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderColor: '#E2E8F0' }}
               >
                 <Typography variant="body2" fontWeight={700} color="text.secondary">{option.label}</Typography>

@@ -363,3 +363,12 @@ export const CHECK_CAR_AVAILABILITY_QUERY = gql`
     }
   }
 `;
+
+export const GET_BOOKING_ID_BY_TOKEN_QUERY = gql`
+  query GetBookingIdByToken($token: String!) {
+    verifyBookingToken(token: $token) {
+      success
+      bookingId
+    }
+  }
+`;

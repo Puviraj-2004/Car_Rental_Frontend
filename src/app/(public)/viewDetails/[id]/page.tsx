@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { use } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@apollo/client';
 import {
@@ -22,9 +22,9 @@ import EventIcon from '@mui/icons-material/Event';
 import { GET_CAR_QUERY } from '@/lib/graphql/queries';
 
 export default function CarDetailsPage() {
-  const params = useParams();
   const router = useRouter();
-  const carId = params.id as string;
+  const params = use(useParams()); // Next.js 15: unwrap Promise
+  const carId = params.id;
 
   const { data, loading, error } = useQuery(GET_CAR_QUERY, {
     variables: { id: carId },

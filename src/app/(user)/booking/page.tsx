@@ -4,6 +4,19 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
+import dayjs from 'dayjs';
+import {
+  parseUrlDateParams,
+  isValidDateTime,
+  formatDateForDisplay,
+  formatTimeForDisplay,
+  generateTimeOptions,
+  getMinPickupDate,
+  isValidDateRange,
+  DateTimeComponents,
+  isValidDateValue,
+  generateDefaultBookingDates
+} from '@/lib/dateUtils';
 import {
   Box, Container, Typography, Paper, Grid, Button, TextField,
   Card, CardContent, CardMedia, Stack, Divider, Alert,
@@ -11,6 +24,7 @@ import {
   DialogActions, FormControl, InputLabel, Select, MenuItem,
   IconButton
 } from '@mui/material';
+import { MenuItem as MuiMenuItem } from '@mui/material';
 import {
   DirectionsCar, AccessTime, CheckCircle, Warning, Info,
   Event, Schedule, Euro, VerifiedUser, Security, Settings, LocalGasStation,
@@ -48,8 +62,59 @@ export default function BookingPage() {
   // URL Parameters
   const carId = searchParams.get('carId');
   const bookingId = searchParams.get('bookingId') || null;
-  const [startDateTime, setStartDateTime] = useState(searchParams.get('start') || '');
-  const [endDateTime, setEndDateTime] = useState(searchParams.get('end') || '');
+
+
+  // Validate required parameters
+  const hasRequiredParams = carId || bookingId;
+  if (!hasRequiredParams && status !== 'loading') {
+    console.error('Missing required parameters: carId or bookingId');
+    router.push('/cars');
+    return null;
+  }
+
+  // Parse URL parameters using industrial date utilities
+  const startParam = searchParams.get('start');
+  const endParam = searchParams.get('end');
+
+  // Debug URL parameters
+  console.log('URL Parameter Debug:', {
+    startParam,
+    endParam,
+    searchParams: Object.fromEntries(searchParams.entries())
+  });
+
+  const { start: urlStartDate, end: urlEndDate } = parseUrlDateParams(startParam, endParam);
+
+  // Generate default dates if URL params are not available
+  const defaultDates = generateDefaultBookingDates();
+
+  console.log('Parsed URL dates:', { urlStartDate, urlEndDate });
+
+  // Initialize date/time state with URL params or defaults
+  const initialStartDate = urlStartDate?.date || defaultDates.start.date;
+  const initialStartTime = urlStartDate?.time || defaultDates.start.time;
+  const initialEndDate = urlEndDate?.date || defaultDates.end.date;
+  const initialEndTime = urlEndDate?.time || defaultDates.end.time;
+
+  console.log('Final initial state values:', {
+    initialStartDate,
+    initialStartTime,
+    initialEndDate,
+    initialEndTime,
+    usedDefaults: !urlStartDate
+  });
+
+  const [startDate, setStartDate] = useState(initialStartDate);
+  const [startTime, setStartTime] = useState(initialStartTime);
+  const [endDate, setEndDate] = useState(initialEndDate);
+  const [endTime, setEndTime] = useState(initialEndTime);
+
+  // Combine date and time for datetime calculations with validation
+  const startDateTime = startDate && startTime ? `${startDate}T${startTime}` : '';
+  const endDateTime = endDate && endTime ? `${endDate}T${endTime}` : '';
+
+  // Generate time options using utility function
+  const timeOptions = generateTimeOptions();
   // UI States
   const [verificationDialog, setVerificationDialog] = useState(false);
   const [availabilityError, setAvailabilityError] = useState(false);
@@ -82,8 +147,13 @@ export default function BookingPage() {
   }, [emailVerificationPopup, confirmedBookingData]);
 
   // GraphQL Queries
-  const { data: userData } = useQuery(GET_ME_QUERY, { skip: !session });
-  const { data: platformData } = useQuery(GET_PLATFORM_SETTINGS_QUERY);
+  const { data: userData, error: userError } = useQuery(GET_ME_QUERY, {
+    skip: !session,
+    errorPolicy: 'all'
+  });
+  const { data: platformData, error: platformError } = useQuery(GET_PLATFORM_SETTINGS_QUERY, {
+    errorPolicy: 'all'
+  });
 
   // Query for existing booking (if bookingId is provided)
   const { data: bookingData, loading: bookingLoading, refetch: refetchBooking } = useQuery(GET_BOOKING_QUERY, {
@@ -93,9 +163,10 @@ export default function BookingPage() {
   });
 
   // Car query - uses bookingData as fallback
+  const carQueryId = carId || bookingData?.booking?.car?.id;
   const { data: carData, loading: carLoading } = useQuery(GET_CAR_QUERY, {
-    variables: { id: carId || bookingData?.booking?.car?.id },
-    skip: !carId && !bookingData?.booking?.car?.id,
+    variables: carQueryId ? { id: carQueryId } : undefined,
+    skip: !carQueryId,
     fetchPolicy: 'cache-and-network'
   });
 
@@ -128,6 +199,29 @@ export default function BookingPage() {
       setRentalType(availableRentalTypes[0].value);
     }
   }, [availableRentalTypes]);
+
+  // Auto-switch rental type based on selected duration
+  useEffect(() => {
+    if (!carData?.car || !startDateTime || !endDateTime) return;
+
+    const start = isValidDate(startDateTime) ? new Date(startDateTime) : new Date();
+    const end = isValidDate(endDateTime) ? new Date(endDateTime) : new Date();
+
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
+
+    // If duration < 24 hours and car has hourly pricing, switch to HOUR
+    // Otherwise, keep DAY (or switch to DAY if currently HOUR)
+    if (diffHours < 24 && carData.car.pricePerHour && carData.car.pricePerHour > 0) {
+      if (rentalType !== 'HOUR') {
+        setRentalType('HOUR');
+      }
+    } else {
+      if (rentalType !== 'DAY') {
+        setRentalType('DAY');
+      }
+    }
+  }, [startDateTime, endDateTime, carData?.car, rentalType]);
 
   // Authentication & Redirect Logic
   useEffect(() => {
@@ -166,8 +260,8 @@ export default function BookingPage() {
   const { data: availabilityData, loading: availabilityLoading } = useQuery(CHECK_CAR_AVAILABILITY_QUERY, {
     variables: {
       carId: carId || bookingData?.booking?.car?.id,
-      startDate: isValidDate(startDateTime) ? new Date(startDateTime).toISOString() : '',
-      endDate: isValidDate(endDateTime) ? new Date(endDateTime).toISOString() : ''
+      startDate: isValidDate(startDateTime) ? new Date(startDateTime).toISOString() : null,
+      endDate: isValidDate(endDateTime) ? new Date(endDateTime).toISOString() : null
     },
     skip: !carId && !bookingData?.booking?.car?.id || !startDateTime || !endDateTime,
     fetchPolicy: 'cache-and-network'
@@ -179,16 +273,78 @@ export default function BookingPage() {
   const [updateBookingStatus] = useMutation(UPDATE_BOOKING_STATUS_MUTATION);
   const [sendVerification] = useMutation(SEND_VERIFICATION_LINK_MUTATION);
 
-  // Populate form data from existing booking
+  // Populate form data from existing booking or URL parameters
   useEffect(() => {
+    console.log('Date population useEffect triggered:', {
+      startParam,
+      endParam,
+      hasBookingData: !!bookingData?.booking,
+      bookingId
+    });
+
+    // Priority 1: Use URL parameters (from car listing page) if available and no existing booking
+    if (startParam && endParam && !bookingData?.booking) {
+      // URL parameters already set the initial state, no need to do anything
+      console.log('Using dates from URL parameters:', { startParam, endParam });
+      return;
+    }
+
+    // Priority 2: Use existing booking data
     if (bookingData?.booking) {
       const booking = bookingData.booking;
-      setStartDateTime(booking.startDate);
-      setEndDateTime(booking.endDate);
+
+      // Parse ISO date strings into separate date and time components with validation
+      if (booking.startDate && booking.endDate) {
+        try {
+          const startDateTime = new Date(booking.startDate);
+          const endDateTime = new Date(booking.endDate);
+
+          // Check if dates are valid before proceeding
+          if (!isNaN(startDateTime.getTime()) && !isNaN(endDateTime.getTime())) {
+            setStartDate(startDateTime.toISOString().split('T')[0]);
+            setStartTime(startDateTime.toISOString().split('T')[1].substring(0, 5)); // HH:MM format
+            setEndDate(endDateTime.toISOString().split('T')[0]);
+            setEndTime(endDateTime.toISOString().split('T')[1].substring(0, 5)); // HH:MM format
+          } else {
+            console.warn('Invalid date values in booking:', booking.startDate, booking.endDate);
+          }
+        } catch (error) {
+          console.error('Error parsing booking dates:', error);
+        }
+      }
+
       setRentalType(booking.rentalType);
       setBookingType(booking.bookingType);
     }
-  }, [bookingData]);
+  }, [bookingData, startParam, endParam]);
+
+  // Robust URL parameter handling with industrial-grade parsing
+  useEffect(() => {
+    console.log('🔄 URL Params Processing:', {
+      startParam,
+      endParam,
+      currentState: { startDate, endDate, startTime, endTime },
+      hasBookingData: !!bookingData?.booking,
+      urlStartDate,
+      urlEndDate
+    });
+
+    // Only process URL params if we don't have existing booking data (avoid conflicts)
+    if (!bookingData?.booking && (startParam || endParam)) {
+      // Use the industrial parseUrlDateParams function for robust parsing
+      if (urlStartDate) {
+        console.log('✅ Setting start date/time from URL:', urlStartDate);
+        setStartDate(urlStartDate.date);
+        setStartTime(urlStartDate.time);
+      }
+
+      if (urlEndDate) {
+        console.log('✅ Setting end date/time from URL:', urlEndDate);
+        setEndDate(urlEndDate.date);
+        setEndTime(urlEndDate.time);
+      }
+    }
+  }, [urlStartDate, urlEndDate, bookingData]); // Use parsed data as dependencies
 
   // Check availability when dates change
   useEffect(() => {
@@ -270,26 +426,41 @@ export default function BookingPage() {
     };
   }, [carData, startDateTime, endDateTime, rentalType, platformData, userData]);
 
+  // Debug logging for GraphQL errors
+  React.useEffect(() => {
+    if (userError) console.error('GET_ME_QUERY Error:', userError);
+    if (platformError) console.error('GET_PLATFORM_SETTINGS_QUERY Error:', platformError);
+  }, [userError, platformError]);
+
   // Auto-create draft booking when coming from car listing (no bookingId)
   useEffect(() => {
     if (!carId || bookingId || createBookingLoading || confirmBookingLoading) return;
 
     // Only create draft if we have all required data and valid dates
-    if (isValidDate(startDateTime) && isValidDate(endDateTime) && priceDetails && carData?.car) {
+    // Also ensure we have proper date/time values (not just empty strings)
+    if (isValidDate(startDateTime) && isValidDate(endDateTime) &&
+        startDateTime && endDateTime && startDate && startTime && endDate && endTime &&
+        priceDetails && carData?.car) {
       handleCreateDraftBooking();
     }
-  }, [carId, bookingId, startDateTime, endDateTime, priceDetails, carData, createBookingLoading, confirmBookingLoading, isValidDate]);
+  }, [carId, bookingId, startDateTime, endDateTime, startDate, startTime, endDate, endTime, priceDetails, carData, createBookingLoading, confirmBookingLoading, isValidDate]);
 
   const handleCreateDraftBooking = async () => {
-    if (!priceDetails || !carId) return;
+    if (!priceDetails || !carId || !startDateTime || !endDateTime) return;
+
+    // Double-check date validity before sending to backend
+    if (!isValidDate(startDateTime) || !isValidDate(endDateTime)) {
+      console.error('Invalid dates detected, skipping booking creation');
+      return;
+    }
 
     try {
         const { data: bData } = await createBooking({
           variables: {
             input: {
               carId: carId,
-              startDate: isValidDate(startDateTime) ? new Date(startDateTime).toISOString() : new Date().toISOString(),
-              endDate: isValidDate(endDateTime) ? new Date(endDateTime).toISOString() : new Date().toISOString(),
+              startDate: new Date(startDateTime).toISOString(),
+              endDate: new Date(endDateTime).toISOString(),
               basePrice: priceDetails.basePrice,
               taxAmount: priceDetails.taxAmount,
               surchargeAmount: priceDetails.totalSurcharge,
@@ -322,12 +493,17 @@ export default function BookingPage() {
 
       // If we don't have a booking ID, create a draft booking first
       if (!bookingIdToConfirm) {
+        // Ensure we have valid dates before creating booking
+        if (!isValidDate(startDateTime) || !isValidDate(endDateTime)) {
+          throw new Error('Please select valid pickup and return dates');
+        }
+
         const { data: bData } = await createBooking({
           variables: {
             input: {
               carId: carId || bookingData?.booking?.car?.id,
-              startDate: isValidDate(startDateTime) ? new Date(startDateTime).toISOString() : new Date().toISOString(),
-              endDate: isValidDate(endDateTime) ? new Date(endDateTime).toISOString() : new Date().toISOString(),
+              startDate: new Date(startDateTime).toISOString(),
+              endDate: new Date(endDateTime).toISOString(),
               basePrice: priceDetails.basePrice,
               taxAmount: priceDetails.taxAmount,
               surchargeAmount: priceDetails.totalSurcharge,
@@ -490,13 +666,101 @@ export default function BookingPage() {
             <Typography variant="h6" fontWeight={800} mb={3} display="flex" alignItems="center">
               <Schedule sx={{ mr: 1, color: '#2563EB' }} /> Rental Configuration
             </Typography>
-            <Grid container spacing={3}>
-              <Grid item xs={12} sm={6}>
-                <TextField fullWidth label="Pickup Date & Time" type="datetime-local" value={startDateTime} onChange={(e) => setStartDateTime(e.target.value)} InputLabelProps={{ shrink: true }} />
+
+            {/* Date/Time Picker - Same as Car Listing Page */}
+            <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#F8FAFC', mb: 3 }}>
+              <Grid container spacing={3} alignItems="center">
+                <Grid item xs={12} md={6}>
+                  <Stack direction="row" spacing={1} sx={{ bgcolor: 'white', p: 1, borderRadius: 2, border: '1px solid #CBD5E1' }}>
+                    <Box sx={{ flex: 1.5 }}>
+                      <Typography variant="caption" fontWeight={800} color="primary" ml={1}>PICKUP DATE</Typography>
+                      <TextField
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        size="small"
+                        fullWidth
+                        inputProps={{
+                          min: getMinPickupDate() // Industrial minimum pickup date
+                        }}
+                        sx={{
+                          '& .MuiInputBase-root': { border: 'none', '&:before': { border: 'none' }, '&:after': { border: 'none' } },
+                          '& .MuiInputBase-input': { padding: '4px 8px', fontSize: '14px' }
+                        }}
+                      />
+                    </Box>
+                    <Divider orientation="vertical" flexItem />
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="caption" fontWeight={800} color="primary">TIME</Typography>
+                      <TextField
+                        select
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
+                        size="small"
+                        fullWidth
+                        sx={{
+                          '& .MuiInputBase-root': { border: 'none', '&:before': { border: 'none' }, '&:after': { border: 'none' } },
+                          '& .MuiInputBase-input': { padding: '4px 0', fontSize: '14px' }
+                        }}
+                      >
+                        {timeOptions.map((time) => (
+                          <MenuItem key={time} value={time}>
+                            {time}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Box>
+                  </Stack>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Stack direction="row" spacing={1} sx={{ bgcolor: !startDate ? '#F1F5F9' : 'white', p: 1, borderRadius: 2, border: '1px solid #CBD5E1', opacity: !startDate ? 0.6 : 1 }}>
+                    <Box sx={{ flex: 1.5 }}>
+                      <Typography variant="caption" fontWeight={800} color="primary" ml={1}>RETURN DATE</Typography>
+                      <TextField
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        disabled={!startDate}
+                        size="small"
+                        fullWidth
+                        inputProps={{
+                          min: startDate // Cannot be before pickup date
+                        }}
+                        sx={{
+                          '& .MuiInputBase-root': { border: 'none', '&:before': { border: 'none' }, '&:after': { border: 'none' } },
+                          '& .MuiInputBase-input': { padding: '4px 8px', fontSize: '14px' }
+                        }}
+                      />
+                    </Box>
+                    <Divider orientation="vertical" flexItem />
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="caption" fontWeight={800} color="primary">TIME</Typography>
+                      <TextField
+                        select
+                        value={endTime}
+                        onChange={(e) => setEndTime(e.target.value)}
+                        disabled={!startDate}
+                        size="small"
+                        fullWidth
+                        sx={{
+                          '& .MuiInputBase-root': { border: 'none', '&:before': { border: 'none' }, '&:after': { border: 'none' } },
+                          '& .MuiInputBase-input': { padding: '4px 0', fontSize: '14px' }
+                        }}
+                      >
+                        {timeOptions.map((time) => (
+                          <MenuItem key={time} value={time}>
+                            {time}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Box>
+                  </Stack>
+                </Grid>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField fullWidth label="Return Date & Time" type="datetime-local" value={endDateTime} onChange={(e) => setEndDateTime(e.target.value)} InputLabelProps={{ shrink: true }} />
-              </Grid>
+            </Paper>
+
+            {/* Rental Type Selection */}
+            <Grid container spacing={3} sx={{ mt: 2 }}>
               <Grid item xs={12} sm={6}>
                 {availableRentalTypes.length === 1 ? (
                   // Single rental type - display as static text

@@ -13,6 +13,7 @@ import { CREATE_BOOKING_MUTATION } from '@/lib/graphql/mutations';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { addHours, addDays, isBefore, isAfter, format, parseISO, startOfHour, startOfDay } from 'date-fns';
+import dayjs from 'dayjs';
 
 // Icons
 import TuneIcon from '@mui/icons-material/Tune';
