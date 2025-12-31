@@ -15,6 +15,7 @@ export const GET_ME_QUERY = gql`
         id
         status
         licenseNumber
+        licenseCategory
         licenseExpiry
         dateOfBirth
         address
@@ -67,6 +68,7 @@ export const GET_MY_BOOKINGS_QUERY = gql`
           imagePath
           isPrimary
         }
+        requiredLicenseCategory
       }
       payment {
         status
@@ -127,6 +129,7 @@ export const GET_ALL_BOOKINGS_QUERY = gql`
           imagePath
           isPrimary
         }
+        requiredLicenseCategory
       }
       payment {
         status
@@ -153,6 +156,8 @@ export const GET_CARS_QUERY = gql`
       transmission
       seats
       mileage
+
+      requiredLicenseCategory
 
       # KM Limits & Meter Tracking
       dailyKmLimit
@@ -186,6 +191,8 @@ export const GET_CAR_QUERY = gql`
       transmission
       seats
       mileage
+
+      requiredLicenseCategory
 
       # KM Limits & Meter Tracking
       dailyKmLimit
@@ -225,6 +232,7 @@ export const GET_AVAILABLE_CARS_QUERY = gql`
         imagePath
         isPrimary
       }
+      requiredLicenseCategory
     }
   }
 `;
@@ -245,6 +253,9 @@ export const GET_CAR_ENUMS = gql`
     carStatusEnum: __type(name: "CarStatus") {
       enumValues { name }
     }
+    licenseCategoryEnum: __type(name: "LicenseCategory") {
+      enumValues { name }
+    }
   }
 `;
 
@@ -257,6 +268,8 @@ export const GET_PLATFORM_SETTINGS_QUERY = gql`
       logoUrl
       currency
       taxPercentage
+      youngDriverMinAge
+      youngDriverFee
       supportPhone
       supportEmail
       address
@@ -294,6 +307,17 @@ export const GET_BOOKING_QUERY = gql`
       startDate
       endDate
 
+      user {
+        id
+        driverProfile {
+          status
+          licenseFrontUrl
+          licenseBackUrl
+          idProofUrl
+          addressProofUrl
+        }
+      }
+
       # Meter Tracking & KM Management
       startMeter
       endMeter
@@ -323,6 +347,7 @@ export const GET_BOOKING_QUERY = gql`
         fuelType
         transmission
         seats
+        requiredLicenseCategory
         dailyKmLimit
         extraKmCharge
         pricePerDay

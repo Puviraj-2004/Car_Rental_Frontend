@@ -50,7 +50,8 @@ export default function EditCarPage() {
       setFormData({
         ...rest,
         brandId: brand?.id || '',
-        modelId: model?.id || ''
+        modelId: model?.id || '',
+        requiredLicenseCategory: rest.requiredLicenseCategory || 'B'
       });
       setExistingImages(images || []);
     }
@@ -117,6 +118,7 @@ export default function EditCarPage() {
         dailyKmLimit: formData.dailyKmLimit,
         extraKmCharge: formData.extraKmCharge,
         currentMileage: formData.currentMileage,
+        requiredLicenseCategory: formData.requiredLicenseCategory,
         critAirRating: formData.critAirRating,
         status: formData.status,
         descriptionEn: formData.descriptionEn,
@@ -281,6 +283,21 @@ export default function EditCarPage() {
                   <InputLabel>CritAir</InputLabel>
                   <Select name="critAirRating" value={formData.critAirRating} label="CritAir" onChange={handleInputChange}>
                     {enumData?.critAirEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={6} md={4}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Required License</InputLabel>
+                  <Select
+                    name="requiredLicenseCategory"
+                    value={formData.requiredLicenseCategory || 'B'}
+                    label="Required License"
+                    onChange={handleInputChange}
+                  >
+                    {(enumData?.licenseCategoryEnum?.enumValues || [{ name: 'B' }]).map((e: any) => (
+                      <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
               </Grid>

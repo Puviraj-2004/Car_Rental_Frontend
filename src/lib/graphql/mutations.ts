@@ -192,9 +192,13 @@ export const CREATE_OR_UPDATE_DRIVER_PROFILE_MUTATION = gql`
     createOrUpdateDriverProfile(input: $input) {
       id
       licenseNumber
+      licenseCategory
+      licenseCategories
+      restrictsToAutomatic
       licenseExpiry
-      idNumber
       dateOfBirth
+      isYoungDriver
+      address
       status
     }
   }
@@ -237,11 +241,21 @@ export const CANCEL_BOOKING_MUTATION = gql`
 export const PROCESS_DOCUMENT_OCR_MUTATION = gql`
   mutation ProcessDocumentOCR($file: Upload!, $documentType: String, $side: String) {
     processDocumentOCR(file: $file, documentType: $documentType, side: $side) {
+      firstName
+      lastName
       fullName
       documentId
+      licenseNumber
       expiryDate
+      documentDate
+      issueDate
       birthDate
       address
+      licenseCategory
+      licenseCategories
+      restrictsToAutomatic
+      fallbackUsed
+      isQuotaExceeded
     }
   }
 `;

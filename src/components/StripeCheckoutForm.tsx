@@ -10,7 +10,6 @@ import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import Typography from '@mui/material/Typography';
 
-// 🚀 நம்முடைய புதிய Schema-விற்கு ஏற்ற Mutation
 const CREATE_PAYMENT = gql`
   mutation CreatePayment($input: CreatePaymentInput!) {
     createPayment(input: $input) {
@@ -77,7 +76,6 @@ export default function StripeCheckoutForm({ bookingId, amount, onSuccess }: Che
     }
 
     try {
-      // 1. Stripe Payment Method-ஐ உருவாக்கவும்
       const { error: stripeError, paymentMethod } = await stripe.createPaymentMethod({
         type: 'card',
         card: cardElement,
@@ -87,10 +85,6 @@ export default function StripeCheckoutForm({ bookingId, amount, onSuccess }: Che
         throw new Error(stripeError.message);
       }
 
-      // 2. Backend-ல் Payment Record-ஐ உருவாக்கவும்
-      // (குறிப்பு: Industrial App-ல், Backend-ல் Stripe Intent உருவாக்கி confirm செய்ய வேண்டும்.
-      // இது ஒரு Basic Implementation)
-      
       const { data } = await createPayment({
         variables: {
           input: {
@@ -98,13 +92,13 @@ export default function StripeCheckoutForm({ bookingId, amount, onSuccess }: Che
             amount: amount,
             currency: "EUR",
             paymentMethod: "CREDIT_CARD",
-            transactionId: paymentMethod.id, // Stripe ID-ஐ சேமிக்கிறோம்
+            transactionId: paymentMethod.id,
           }
         }
       });
 
       if (data?.createPayment?.status === 'COMPLETED' || data?.createPayment?.status === 'PENDING') {
-         onSuccess(); // Payment Success!
+         onSuccess(); 
       } else {
          setError('Payment failed on server side.');
       }

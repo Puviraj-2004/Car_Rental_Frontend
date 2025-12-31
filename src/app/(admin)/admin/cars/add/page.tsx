@@ -28,6 +28,7 @@ export default function AddCarPage() {
     plateNumber: '', fuelType: '', transmission: '',
     seats: 5, pricePerHour: 0, pricePerDay: 0,
     depositAmount: 0,
+    requiredLicenseCategory: 'B',
     // KM Limits & Meter Tracking
     dailyKmLimit: null as number | null,
     extraKmCharge: null as number | null,
@@ -188,6 +189,21 @@ export default function AddCarPage() {
                   <InputLabel>CritAir</InputLabel>
                   <Select name="critAirRating" value={formData.critAirRating} label="CritAir" onChange={handleInputChange}>
                     {enumData?.critAirEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={6} md={4}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Required License</InputLabel>
+                  <Select
+                    name="requiredLicenseCategory"
+                    value={formData.requiredLicenseCategory}
+                    label="Required License"
+                    onChange={handleInputChange}
+                  >
+                    {(enumData?.licenseCategoryEnum?.enumValues || [{ name: 'B' }]).map((e: any) => (
+                      <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
               </Grid>

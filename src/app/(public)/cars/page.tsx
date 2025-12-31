@@ -256,6 +256,15 @@ export default function CarsListingPage() {
       setAlertOpen(true);
       setDetailsOpen(false);
     } else {
+      const getApolloErrorMessage = (err: any) => {
+        // ApolloError shape: { graphQLErrors, networkError, message }
+        const gqlMsg = err?.graphQLErrors?.[0]?.message;
+        if (gqlMsg) return gqlMsg;
+        const netMsg = err?.networkError?.message;
+        if (netMsg) return netMsg;
+        return err?.message || 'Something went wrong. Please try again.';
+      };
+
       // Check if user is authenticated
       if (status !== 'authenticated') {
         // Redirect to login with booking URL as callback
@@ -269,7 +278,9 @@ export default function CarsListingPage() {
         // Find the car data for pricing
         const selectedCar = data?.cars.find((car: any) => car.id === carId);
         if (!selectedCar) {
-          alert('Car not found');
+          setAlertMessage('Car not found. Please refresh and try again.');
+          setAlertSeverity('error');
+          setAlertOpen(true);
           return;
         }
 
@@ -322,12 +333,16 @@ export default function CarsListingPage() {
           // Redirect to booking page with the created draft booking
           router.push(`/booking?bookingId=${bookingResult.createBooking.id}`);
         } else {
-          alert('Failed to create booking. Please try again.');
+          setAlertMessage('Failed to create booking. Please try again.');
+          setAlertSeverity('error');
+          setAlertOpen(true);
         }
 
       } catch (error: any) {
         console.error('Error creating booking:', error);
-        alert('Error creating booking: ' + error.message);
+        setAlertMessage(getApolloErrorMessage(error));
+        setAlertSeverity('error');
+        setAlertOpen(true);
       }
     }
   };
