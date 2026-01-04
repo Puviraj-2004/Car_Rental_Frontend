@@ -7,8 +7,8 @@ import {
   TableContainer, TableHead, TableRow, IconButton, Dialog,
   DialogTitle, DialogActions, Chip, CircularProgress,
   Alert, Grid, Card, CardMedia, CardContent,
-  ToggleButtonGroup, ToggleButton, Stack, Avatar, TextField, MenuItem,
-  Divider, alpha
+  ToggleButtonGroup, ToggleButton, Stack, Avatar,
+  Divider, alpha, Checkbox, FormControlLabel
 } from '@mui/material';
 import { 
   Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, 
@@ -33,14 +33,17 @@ export default function CarsPage() {
   const [selectedCar, setSelectedCar] = useState({ id: '', name: '' });
 
   const [filters, setFilters] = useState({
-    brandId: '',
-    modelId: '',
-    fuelType: undefined as string | undefined,
-    transmission: undefined as string | undefined,
-    status: undefined as string | undefined,
-    critAirRating: undefined as string | undefined,
+    brandIds: [] as string[],
+    modelIds: [] as string[],
+    fuelTypes: [] as string[],
+    transmissions: [] as string[],
+    statuses: [] as string[],
+    critAirRatings: [] as string[],
     includeOutOfService: true
   });
+
+  // For model filtering - use first selected brand or empty
+  const selectedBrandForModels = filters.brandIds.length > 0 ? filters.brandIds[0] : '';
 
   const { loading, error, data, refetch } = useQuery(GET_CARS_QUERY, {
     variables: {
@@ -54,8 +57,8 @@ export default function CarsPage() {
 
   const { data: brandData } = useQuery(GET_BRANDS_QUERY);
   const { data: modelData } = useQuery(GET_MODELS_QUERY, {
-    variables: { brandId: filters.brandId },
-    skip: !filters.brandId,
+    variables: { brandId: selectedBrandForModels },
+    skip: !selectedBrandForModels,
   });
 
   const { data: enumData } = useQuery(GET_CAR_ENUMS);
@@ -69,8 +72,12 @@ export default function CarsPage() {
 
   const resetFilters = () => {
     setFilters({
-      brandId: '', modelId: '', fuelType: undefined,
-      transmission: undefined, status: undefined, critAirRating: undefined,
+      brandIds: [],
+      modelIds: [],
+      fuelTypes: [],
+      transmissions: [],
+      statuses: [],
+      critAirRatings: [],
       includeOutOfService: true
     });
   };
@@ -80,11 +87,6 @@ export default function CarsPage() {
     return text.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
   };
 
-  if (loading && !data) return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-      <CircularProgress thickness={5} size={50} sx={{ color: '#293D91' }} />
-    </Box>
-  );
 
   return (
     <Box sx={{ pb: 5 }}>
@@ -108,14 +110,138 @@ export default function CarsPage() {
       </Stack>
 
       <Paper elevation={0} sx={{ p: 3, mb: 4, borderRadius: 4, border: '1px solid #E2E8F0' }}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} sm={6} md={2}><TextField select fullWidth size="small" label="Brand" value={filters.brandId} onChange={(e) => setFilters({ ...filters, brandId: e.target.value, modelId: '' })}><MenuItem value="">All Brands</MenuItem>{brandData?.brands.map((b: any) => <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>)}</TextField></Grid>
-          <Grid item xs={12} sm={6} md={2}><TextField select fullWidth size="small" label="Model" value={filters.modelId} disabled={!filters.brandId} onChange={(e) => setFilters({ ...filters, modelId: e.target.value })}><MenuItem value="">All Models</MenuItem>{modelData?.models.map((m: any) => <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>)}</TextField></Grid>
-          <Grid item xs={12} sm={6} md={1.5}><TextField select fullWidth size="small" label="Fuel" value={filters.fuelType || ''} onChange={(e) => setFilters({ ...filters, fuelType: e.target.value || undefined })}><MenuItem value="">All Fuels</MenuItem>{enumData?.fuelTypeEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{formatEnum(e.name)}</MenuItem>)}</TextField></Grid>
-          <Grid item xs={12} sm={6} md={1.5}><TextField select fullWidth size="small" label="Status" value={filters.status || ''} onChange={(e) => setFilters({ ...filters, status: e.target.value || undefined })}><MenuItem value="">All Status</MenuItem>{enumData?.carStatusEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{formatEnum(e.name)}</MenuItem>)}</TextField></Grid>
-          <Grid item xs={12} sm={6} md={2}><TextField select fullWidth size="small" label="CritAir" value={filters.critAirRating || ''} onChange={(e) => setFilters({ ...filters, critAirRating: e.target.value || undefined })}><MenuItem value="">All Ratings</MenuItem>{enumData?.critAirEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{formatEnum(e.name)}</MenuItem>)}</TextField></Grid>
-          <Grid item xs={12} sm={6} md={1.5}><TextField select fullWidth size="small" label="Gear" value={filters.transmission || ''} onChange={(e) => setFilters({ ...filters, transmission: e.target.value || undefined })}><MenuItem value="">All Gears</MenuItem>{enumData?.transmissionEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{formatEnum(e.name)}</MenuItem>)}</TextField></Grid>
-          <Grid item xs={12} md={1.5}><Button fullWidth variant="text" startIcon={<ClearIcon />} onClick={resetFilters}>Reset</Button></Grid>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6" fontWeight={600}>Filters</Typography>
+          <Button variant="text" startIcon={<ClearIcon />} onClick={resetFilters} size="small">
+            Reset All
+          </Button>
+        </Box>
+
+        <Grid container spacing={3}>
+          {/* Brands Filter */}
+          <Grid item xs={12} md={6} lg={3}>
+            <Typography variant="subtitle2" fontWeight={600} mb={1}>Brands</Typography>
+            <Box sx={{ maxHeight: 200, overflowY: 'auto' }}>
+              {brandData?.brands.map((brand: any) => (
+                <FormControlLabel
+                  key={brand.id}
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={filters.brandIds.includes(brand.id)}
+                      onChange={(e) => {
+                        const newBrandIds = e.target.checked
+                          ? [...filters.brandIds, brand.id]
+                          : filters.brandIds.filter(id => id !== brand.id);
+                        setFilters({ ...filters, brandIds: newBrandIds, modelIds: [] });
+                      }}
+                    />
+                  }
+                  label={<Typography variant="body2">{brand.name}</Typography>}
+                />
+              ))}
+            </Box>
+          </Grid>
+
+          {/* Models Filter */}
+          <Grid item xs={12} md={6} lg={3}>
+            <Typography variant="subtitle2" fontWeight={600} mb={1}>Models</Typography>
+            <Box sx={{ maxHeight: 200, overflowY: 'auto' }}>
+              {modelData?.models.map((model: any) => (
+                  <FormControlLabel
+                    key={model.id}
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={filters.modelIds.includes(model.id)}
+                        onChange={(e) => {
+                          const newModelIds = e.target.checked
+                            ? [...filters.modelIds, model.id]
+                            : filters.modelIds.filter(id => id !== model.id);
+                          setFilters({ ...filters, modelIds: newModelIds });
+                        }}
+                      />
+                    }
+                    label={<Typography variant="body2">{model.name}</Typography>}
+                  />
+                ))}
+            </Box>
+          </Grid>
+
+          {/* Fuel Types Filter */}
+          <Grid item xs={12} md={6} lg={2}>
+            <Typography variant="subtitle2" fontWeight={600} mb={1}>Fuel Type</Typography>
+            <Box>
+              {enumData?.fuelTypeEnum?.enumValues.map((fuel: any) => (
+                <FormControlLabel
+                  key={fuel.name}
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={filters.fuelTypes.includes(fuel.name)}
+                      onChange={(e) => {
+                        const newFuelTypes = e.target.checked
+                          ? [...filters.fuelTypes, fuel.name]
+                          : filters.fuelTypes.filter(type => type !== fuel.name);
+                        setFilters({ ...filters, fuelTypes: newFuelTypes });
+                      }}
+                    />
+                  }
+                  label={<Typography variant="body2">{formatEnum(fuel.name)}</Typography>}
+                />
+              ))}
+            </Box>
+          </Grid>
+
+          {/* Transmission Filter */}
+          <Grid item xs={12} md={6} lg={2}>
+            <Typography variant="subtitle2" fontWeight={600} mb={1}>Transmission</Typography>
+            <Box>
+              {enumData?.transmissionEnum?.enumValues.map((trans: any) => (
+                <FormControlLabel
+                  key={trans.name}
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={filters.transmissions.includes(trans.name)}
+                      onChange={(e) => {
+                        const newTransmissions = e.target.checked
+                          ? [...filters.transmissions, trans.name]
+                          : filters.transmissions.filter(type => type !== trans.name);
+                        setFilters({ ...filters, transmissions: newTransmissions });
+                      }}
+                    />
+                  }
+                  label={<Typography variant="body2">{formatEnum(trans.name)}</Typography>}
+                />
+              ))}
+            </Box>
+          </Grid>
+
+          {/* Status Filter */}
+          <Grid item xs={12} md={6} lg={2}>
+            <Typography variant="subtitle2" fontWeight={600} mb={1}>Status</Typography>
+            <Box>
+              {enumData?.carStatusEnum?.enumValues.map((status: any) => (
+                <FormControlLabel
+                  key={status.name}
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={filters.statuses.includes(status.name)}
+                      onChange={(e) => {
+                        const newStatuses = e.target.checked
+                          ? [...filters.statuses, status.name]
+                          : filters.statuses.filter(s => s !== status.name);
+                        setFilters({ ...filters, statuses: newStatuses });
+                      }}
+                    />
+                  }
+                  label={<Typography variant="body2">{formatEnum(status.name)}</Typography>}
+                />
+              ))}
+            </Box>
+          </Grid>
         </Grid>
       </Paper>
 
@@ -129,7 +255,7 @@ export default function CarsPage() {
                   <CardMedia
                     component="img" height="190"
                     // ✅ மாற்றப்பட்டது: API_BASE_URL நீக்கப்பட்டது
-                    image={car.images?.length > 0 ? (car.images.find((i: any) => i.isPrimary)?.imagePath || car.images[0].imagePath) : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2VlZWVlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iMC4zNWVtIiBmaWxsPSIjYWFhYWFhIiBmb250LXNpemU9IjE0Ij5ObyBJbWFnZTwvdGV4dD48L3N2Zz4='}
+                    image={car.images?.length > 0 ? (car.images.find((i: any) => i.isPrimary)?.url || car.images[0].url) : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2VlZWVlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iMC4zNWVtIiBmaWxsPSIjYWFhYWFhIiBmb250LXNpemU9IjE0Ij5ObyBJbWFnZTwvdGV4dD48L3N2Zz4='}
                     sx={{ bgcolor: '#F8FAFC', objectFit: 'cover' }}
                   />
                   <Chip label={car.status} size="small" sx={{ position: 'absolute', top: 12, right: 12, fontWeight: 800, bgcolor: car.status === 'AVAILABLE' ? '#DCFCE7' : '#FEE2E2', color: car.status === 'AVAILABLE' ? '#166534' : '#991B1B' }} />
@@ -142,9 +268,18 @@ export default function CarsPage() {
                   </Stack>
                   <Divider sx={{ mb: 2 }} />
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Typography variant="h5" fontWeight={900} color="#293D91">€{car.pricePerDay}<Typography component="span" variant="caption">/day</Typography></Typography>
+                    <Typography variant="h5" fontWeight={900} color="#293D91">€{car.pricePerDay?.toFixed(2)}<Typography component="span" variant="caption">/day</Typography></Typography>
                     <Stack direction="row" spacing={1}>
-                      <IconButton size="small" onClick={() => router.push(`/admin/cars/${car.id}`)} sx={{ bgcolor: '#F1F5F9' }}><EditIcon fontSize="small" /></IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          console.log('Navigating to edit car:', car.id);
+                          router.push(`/admin/cars/${car.id}`);
+                        }}
+                        sx={{ bgcolor: '#F1F5F9' }}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
                       <IconButton size="small" color="error" onClick={() => { setSelectedCar({ id: car.id, name: car.model.name }); setDeleteDialogOpen(true); }} sx={{ bgcolor: alpha('#EF4444', 0.1) }}><DeleteIcon fontSize="small" /></IconButton>
                     </Stack>
                   </Stack>
@@ -175,7 +310,7 @@ export default function CarsPage() {
                     <Stack direction="row" spacing={2} alignItems="center">
                       {/* ✅ மாற்றப்பட்டது: API_BASE_URL நீக்கப்பட்டது */}
                       <Avatar 
-                        src={car.images?.length > 0 ? (car.images.find((i: any) => i.isPrimary)?.imagePath || car.images[0].imagePath) : ''} 
+                        src={car.images?.length > 0 ? (car.images.find((i: any) => i.isPrimary)?.url || car.images[0].url) : ''} 
                         variant="rounded" 
                         sx={{ width: 60, height: 45, borderRadius: 2 }}
                       ><CarIcon /></Avatar>
@@ -186,10 +321,18 @@ export default function CarsPage() {
                     </Stack>
                   </TableCell>
                   <TableCell>{car.year} • {car.fuelType} • {formatEnum(car.critAirRating)}</TableCell>
-                  <TableCell><Typography fontWeight={900} color="#293D91">€{car.pricePerDay}</Typography></TableCell>
+                  <TableCell><Typography fontWeight={900} color="#293D91">€{car.pricePerDay?.toFixed(2)}</Typography></TableCell>
                   <TableCell><Chip label={car.status} size="small" sx={{ fontWeight: 800, bgcolor: car.status === 'AVAILABLE' ? '#DCFCE7' : '#FEE2E2', color: car.status === 'AVAILABLE' ? '#166534' : '#991B1B' }} /></TableCell>
                   <TableCell align="right">
-                    <IconButton size="small" onClick={() => router.push(`/admin/cars/${car.id}`)}><EditIcon fontSize="small" /></IconButton>
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        console.log('Navigating to edit car:', car.id);
+                        router.push(`/admin/cars/${car.id}`);
+                      }}
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
                     <IconButton size="small" color="error" onClick={() => { setSelectedCar({ id: car.id, name: car.model.name }); setDeleteDialogOpen(true); }}><DeleteIcon fontSize="small" /></IconButton>
                   </TableCell>
                 </TableRow>

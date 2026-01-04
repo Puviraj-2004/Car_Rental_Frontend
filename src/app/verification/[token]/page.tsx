@@ -76,7 +76,7 @@ export default function DriverVerificationPage({ params }: DriverVerificationPag
 
   const [autoFilled, setAutoFilled] = useState({
     license: { name: false, licenseNumber: false, licenseCategory: false, expiryDate: false },
-    cni: { name: false, idNumber: false, dateOfBirth: false },
+    cni: { name: false, idNumber: false },
     address: { address: false, documentDate: false }
   });
 
@@ -209,7 +209,7 @@ export default function DriverVerificationPage({ params }: DriverVerificationPag
     // Step 1: CNI
     // Step 2: Address proof
     const hasLicense = !!(profile.licenseFrontUrl && profile.licenseBackUrl);
-    const hasCni = !!profile.idProofUrl;
+    const hasCni = !!profile.idCardUrl;
     const hasAddress = !!profile.addressProofUrl;
 
     if (!hasLicense) {
@@ -239,7 +239,7 @@ export default function DriverVerificationPage({ params }: DriverVerificationPag
     file: null as File | null,
     name: '',
     idNumber: '',
-    dateOfBirth: '',
+    // dateOfBirth comes from user object, not profile
     ocrAttempted: false,
     ocrSuccess: false
   });
@@ -584,12 +584,15 @@ export default function DriverVerificationPage({ params }: DriverVerificationPag
       }
     } catch (error: any) {
       console.error('OCR processing error:', error);
+      showToast('OCR failed. Please enter details manually.', 'info');
 
       // Allow user to proceed with manual entry even if OCR fails at the network layer.
       if (type === 'license') {
+        setManualMode(prev => ({ ...prev, license: true }));
         setLicenseData(prev => ({ ...prev, ocrAttempted: true, ocrSuccess: false }));
       }
       if (type === 'cni') {
+        setManualMode(prev => ({ ...prev, cni: true }));
         setCniData(prev => ({ ...prev, ocrAttempted: true, ocrSuccess: false }));
       }
       if (type === 'address') {

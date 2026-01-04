@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react';
 import {
   Box, Container, Typography, Card, Stack, Chip, Button,
   Divider, Skeleton, IconButton, Dialog, DialogContent,
-  DialogTitle, Grid, Paper, Fade, Alert, TextField, Link
+  Grid, Paper, Fade, Alert, TextField,DialogTitle, Link
 } from '@mui/material';
 import {
   AccessTime as TimerIcon,
@@ -41,6 +41,9 @@ export default function BookingRecordsPage() {
     skip: status !== 'authenticated'
   });
 
+  // Filter out DRAFT bookings for display
+  const filteredBookings = data?.myBookings?.filter((booking: any) => booking.status !== 'DRAFT') || [];
+
   // Auto-refetch if refresh parameter is present
   useEffect(() => {
     if (searchParams.get('refresh')) {
@@ -56,6 +59,31 @@ export default function BookingRecordsPage() {
 
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [bookingToCancel, setBookingToCancel] = useState<any>(null);
+
+  const [cancelBooking, { loading: cancelLoading }] = useMutation(CANCEL_BOOKING_MUTATION);
+
+  const handleCancelBooking = async (bookingId: string) => {
+    setBookingToCancel(data?.myBookings?.find((b: any) => b.id === bookingId));
+    setCancelDialogOpen(true);
+  };
+
+  const confirmCancelBooking = async () => {
+    if (!bookingToCancel) return;
+
+    try {
+      await cancelBooking({
+        variables: { id: bookingToCancel.id }
+      });
+
+      setCancelDialogOpen(false);
+      setBookingToCancel(null);
+      refetch(); // Refresh the bookings list
+    } catch (error: any) {
+      alert('Failed to cancel booking: ' + error.message);
+    }
+  };
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -100,15 +128,18 @@ export default function BookingRecordsPage() {
           <Stack spacing={2}>
             {[1, 2, 3].map((i) => <Skeleton key={i} variant="rectangular" height={120} sx={{ borderRadius: 4 }} />)}
           </Stack>
-        ) : data?.myBookings.length === 0 ? (
+        ) : filteredBookings.length === 0 ? (
           <Box textAlign="center" py={10}>
             <CarIcon sx={{ fontSize: 60, color: 'text.disabled', mb: 2 }} />
-            <Typography variant="h6" fontWeight={700}>No bookings yet</Typography>
+            <Typography variant="h6" fontWeight={700}>No confirmed bookings yet</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Your draft bookings will appear here once confirmed.
+            </Typography>
             <Button variant="contained" sx={{ mt: 2, borderRadius: 2 }} onClick={() => window.location.href = '/cars'}>Explore Cars</Button>
           </Box>
         ) : (
           <Stack spacing={2}>
-            {data?.myBookings.map((booking: any) => (
+            {filteredBookings.map((booking: any) => (
               <BookingCard 
                 key={booking.id} 
                 booking={booking} 
@@ -124,7 +155,177 @@ export default function BookingRecordsPage() {
         open={detailsOpen} 
         onClose={() => setDetailsOpen(false)} 
         booking={selectedBooking} 
+        data={data}
+        setBookingToCancel={setBookingToCancel}
+        setCancelDialogOpen={setCancelDialogOpen}
+        onCancelBooking={handleCancelBooking}
       />
+
+      {/* Cancel Booking Confirmation Dialog */}
+      <Dialog
+        open={cancelDialogOpen}
+        onClose={() => setCancelDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        sx={{
+          '& .MuiDialog-paper': {
+            borderRadius: 3,
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          },
+          '@keyframes spin': {
+            '0%': { transform: 'rotate(0deg)' },
+            '100%': { transform: 'rotate(360deg)' },
+          }
+        }}
+      >
+        <DialogContent sx={{ p: 0 }}>
+          <Box sx={{ p: 4 }}>
+            {/* Header */}
+            <Box sx={{ textAlign: 'center', mb: 3 }}>
+              <Box sx={{
+                width: 64,
+                height: 64,
+                borderRadius: '50%',
+                bgcolor: '#FEE2E2',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mx: 'auto',
+                mb: 2
+              }}>
+                <CancelIcon sx={{ fontSize: 32, color: '#DC2626' }} />
+              </Box>
+              <Typography variant="h5" fontWeight={700} color="#DC2626" sx={{ mb: 1 }}>
+                Cancel Booking
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                This action cannot be undone
+              </Typography>
+            </Box>
+
+            {/* Warning Message */}
+            <Typography variant="body1" sx={{ mb: 3, textAlign: 'center', color: '#374151' }}>
+              Are you sure you want to cancel this booking? You will lose any payments made and the vehicle reservation.
+            </Typography>
+
+            {/* Booking Details */}
+            {bookingToCancel && (
+              <Box sx={{
+                p: 3,
+                bgcolor: '#F8FAFC',
+                borderRadius: 2,
+                border: '1px solid #E2E8F0',
+                mb: 3
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                  <Box sx={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 2,
+                    bgcolor: '#2563EB',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <Typography variant="body1" fontWeight={700} color="white">
+                      {bookingToCancel.car?.brand?.name?.charAt(0)}
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="subtitle1" fontWeight={600}>
+                      {bookingToCancel.car?.brand?.name} {bookingToCancel.car?.model?.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Booking #{bookingToCancel.id.slice(-6).toUpperCase()}
+                    </Typography>
+                  </Box>
+                </Box>
+
+                <Stack spacing={1}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">
+                        Pickup
+                      </Typography>
+                      <Typography variant="body2" fontWeight={600}>
+                        {formatDateForDisplay(bookingToCancel.startDate)}
+                        {bookingToCancel.pickupTime && (
+                          <span> at {formatTimeForDisplay(bookingToCancel.pickupTime)}</span>
+                        )}
+                      </Typography>
+                    </Box>
+                    <Typography variant="h6" fontWeight={700} color="#DC2626">
+                      €{bookingToCancel.totalPrice?.toFixed(2)}
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">
+                        Return
+                      </Typography>
+                      <Typography variant="body2" fontWeight={600}>
+                        {formatDateForDisplay(bookingToCancel.endDate)}
+                        {bookingToCancel.returnTime && (
+                          <span> at {formatTimeForDisplay(bookingToCancel.returnTime)}</span>
+                        )}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Stack>
+              </Box>
+            )}
+
+            {/* Action Buttons */}
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <Button
+                onClick={() => setCancelDialogOpen(false)}
+                variant="outlined"
+                fullWidth
+                size="large"
+                sx={{
+                  py: 1.5,
+                  fontWeight: 600,
+                  borderColor: '#D1D5DB',
+                  color: '#6B7280'
+                }}
+              >
+                Keep Booking
+              </Button>
+              <Button
+                onClick={confirmCancelBooking}
+                variant="contained"
+                fullWidth
+                size="large"
+                disabled={cancelLoading}
+                sx={{
+                  py: 1.5,
+                  fontWeight: 600,
+                  bgcolor: '#DC2626',
+                  '&:hover': { bgcolor: '#B91C1C' },
+                  '&:disabled': { bgcolor: '#FCA5A5' }
+                }}
+              >
+                {cancelLoading ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{
+                      width: 16,
+                      height: 16,
+                      border: '2px solid #991B1B',
+                      borderTop: '2px solid transparent',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite'
+                    }} />
+                    Cancelling...
+                  </Box>
+                ) : (
+                  'Cancel Booking'
+                )}
+              </Button>
+            </Box>
+          </Box>
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 }
@@ -193,7 +394,7 @@ const BookingCard = ({ booking, onViewDetails }: any) => {
         <Box p={2}>
           <Stack direction="row" spacing={2} alignItems="center">
             <Box sx={{ width: 60, height: 60, borderRadius: 2, bgcolor: '#F1F5F9', overflow: 'hidden' }}>
-              <img src={booking.car.images[0]?.imagePath} alt="car" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={booking.car.images[0]?.url} alt="car" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </Box>
             <Box flex={1}>
               <Typography fontWeight={800} fontSize={16}>{booking.car.brand.name} {booking.car.model.name}</Typography>
@@ -208,15 +409,36 @@ const BookingCard = ({ booking, onViewDetails }: any) => {
                       return 'Invalid dates';
                     }
 
-                    // Extract just the month and day part for compact display
-                    const startParts = startDateStr.split(' ');
-                    const endParts = endDateStr.split(' ');
+                    // Format with times if available
+                    let displayText = '';
+                    if (startDateStr !== 'Invalid Date' && endDateStr !== 'Invalid Date') {
+                      // Extract just the month and day part for compact display
+                      const startParts = startDateStr.split(' ');
+                      const endParts = endDateStr.split(' ');
 
-                    if (startParts.length >= 2 && endParts.length >= 2) {
-                      return `${startParts[1]} ${startParts[0]} - ${endParts[1]} ${endParts[0]}`;
+                      if (startParts.length >= 2 && endParts.length >= 2) {
+                        displayText = `${startParts[1]} ${startParts[0]}`;
+                        if (booking.pickupTime) {
+                          displayText += ` ${formatTimeForDisplay(booking.pickupTime)}`;
+                        }
+                        displayText += ` - ${endParts[1]} ${endParts[0]}`;
+                        if (booking.returnTime) {
+                          displayText += ` ${formatTimeForDisplay(booking.returnTime)}`;
+                        }
+                        return displayText;
+                      }
                     }
 
-                    return `${startDateStr} - ${endDateStr}`;
+                    // Fallback to full dates with times
+                    displayText = `${startDateStr}`;
+                    if (booking.pickupTime) {
+                      displayText += ` ${formatTimeForDisplay(booking.pickupTime)}`;
+                    }
+                    displayText += ` - ${endDateStr}`;
+                    if (booking.returnTime) {
+                      displayText += ` ${formatTimeForDisplay(booking.returnTime)}`;
+                    }
+                    return displayText;
                   } catch (error) {
                     return 'Invalid dates';
                   }
@@ -244,27 +466,25 @@ const BookingCard = ({ booking, onViewDetails }: any) => {
 };
 
 // --- 🚀 SUB-COMPONENT: DETAILS MODAL ---
-const BookingDetailsModal = ({ open, onClose, booking }: any) => {
+const BookingDetailsModal = ({
+  open,
+  onClose,
+  booking,
+  data,
+  setBookingToCancel,
+  setCancelDialogOpen,
+  onCancelBooking
+}: any) => {
   const router = useRouter();
   const [verificationTimer, setVerificationTimer] = useState<string>('');
   const [magicLink, setMagicLink] = useState<string>('');
 
   const [resendVerification, { loading: resendLoading }] = useMutation(RESEND_VERIFICATION_LINK_MUTATION);
-  const [cancelBooking, { loading: cancelLoading }] = useMutation(CANCEL_BOOKING_MUTATION);
 
   useEffect(() => {
-    console.log('🔍 Booking Records - Checking verification data:', {
-      bookingStatus: booking?.status,
-      hasVerification: !!booking?.verification,
-      verificationToken: booking?.verification?.token,
-      verificationId: booking?.verification?.id
-    });
-
     if (booking?.status === 'AWAITING_VERIFICATION' && booking.verification && booking.verification.token) {
       // Generate magic link for verification
       const link = `${window.location.origin}/verification/${booking.verification.token}`;
-      console.log('🔗 Generated magic link:', link);
-      console.log('🔗 Raw token:', booking.verification.token);
       setMagicLink(link);
 
       // Set up 1-hour expiry timer
@@ -294,25 +514,6 @@ const BookingDetailsModal = ({ open, onClose, booking }: any) => {
     onClose();
   };
 
-  const handleCancelBooking = async () => {
-    if (!confirm('Are you sure you want to cancel this draft booking? This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      await cancelBooking({
-        variables: { id: booking.id }
-      });
-
-      alert('Booking cancelled successfully!');
-      onClose();
-      // Refresh the bookings list
-      window.location.reload();
-    } catch (error: any) {
-      alert('Failed to cancel booking: ' + error.message);
-    }
-  };
-
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
   };
@@ -321,8 +522,8 @@ const BookingDetailsModal = ({ open, onClose, booking }: any) => {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth sx={{ m: { xs: 1, md: 5 }, borderRadius: { md: 4 } }}>
-      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E2E8F0' }}>
-        <Typography fontWeight={900}>Booking Details</Typography>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E2E8F0', fontWeight: 900 }}>
+        Booking Details
         <IconButton onClick={onClose}><CloseIcon /></IconButton>
       </DialogTitle>
       <DialogContent sx={{ p: { xs: 2, md: 3 }, bgcolor: '#F8FAFC' }}>
@@ -373,8 +574,7 @@ const BookingDetailsModal = ({ open, onClose, booking }: any) => {
               <Button
                 variant="outlined"
                 fullWidth
-                onClick={handleCancelBooking}
-                disabled={cancelLoading}
+                onClick={() => onCancelBooking(booking.id)}
                 sx={{
                   borderColor: '#DC2626',
                   color: '#DC2626',
@@ -387,7 +587,7 @@ const BookingDetailsModal = ({ open, onClose, booking }: any) => {
                   flex: 1
                 }}
               >
-                {cancelLoading ? 'Cancelling...' : 'Cancel Booking'}
+                Cancel Booking
               </Button>
             </Stack>
           </Paper>
@@ -583,7 +783,7 @@ const BookingDetailsModal = ({ open, onClose, booking }: any) => {
           <Typography variant="caption" color="primary" fontWeight={800}>CAR DETAILS</Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mt={1} alignItems={{ xs: 'center', sm: 'flex-start' }}>
             <Box sx={{ width: { xs: 120, sm: 100 }, height: { xs: 80, sm: 60 }, borderRadius: 2, overflow: 'hidden' }}>
-              <img src={booking.car.images[0]?.imagePath} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={booking.car.images[0]?.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </Box>
             <Box sx={{ textAlign: { xs: 'center', sm: 'left' } }}>
               <Typography fontWeight={800}>{booking.car.brand.name} {booking.car.model.name}</Typography>
@@ -597,15 +797,21 @@ const BookingDetailsModal = ({ open, onClose, booking }: any) => {
           <Typography variant="caption" color="primary" fontWeight={800}>BOOKING DETAILS</Typography>
           <Stack spacing={2} mt={1}>
             <Box display="flex" justifyContent="space-between">
-              <Typography variant="body2">Pickup Date</Typography>
+              <Typography variant="body2">Pickup Date & Time</Typography>
               <Typography fontWeight={700}>
                 {formatDateForDisplay(booking.startDate)}
+                {booking.pickupTime && (
+                  <span> at {formatTimeForDisplay(booking.pickupTime)}</span>
+                )}
               </Typography>
             </Box>
             <Box display="flex" justifyContent="space-between">
-              <Typography variant="body2">Return Date</Typography>
+              <Typography variant="body2">Return Date & Time</Typography>
               <Typography fontWeight={700}>
                 {formatDateForDisplay(booking.endDate)}
+                {booking.returnTime && (
+                  <span> at {formatTimeForDisplay(booking.returnTime)}</span>
+                )}
               </Typography>
             </Box>
             <Box display="flex" justifyContent="space-between">
@@ -621,7 +827,7 @@ const BookingDetailsModal = ({ open, onClose, booking }: any) => {
           <Stack spacing={1} mt={1}>
             <Box display="flex" justifyContent="space-between">
               <Typography variant="body2">Base Price</Typography>
-              <Typography fontWeight={700}>€{booking.basePrice}</Typography>
+              <Typography fontWeight={700}>€{booking.basePrice?.toFixed(2)}</Typography>
             </Box>
             <Box display="flex" justifyContent="space-between">
               <Typography variant="body2">Taxes</Typography>
@@ -630,13 +836,100 @@ const BookingDetailsModal = ({ open, onClose, booking }: any) => {
             <Divider />
             <Box display="flex" justifyContent="space-between">
               <Typography fontWeight={900}>Total Paid</Typography>
-              <Typography fontWeight={900} color="primary">€{booking.totalPrice}</Typography>
+              <Typography fontWeight={900} color="primary">€{booking.totalPrice?.toFixed(2)}</Typography>
             </Box>
           </Stack>
         </Paper>
 
-        {/* Status Info */}
-        {booking.status !== 'DRAFT' && booking.status !== 'AWAITING_VERIFICATION' && (
+        {/* PENDING Status - QR Code and Actions */}
+        {booking.status === 'PENDING' && (
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 4, mb: 3, bgcolor: '#F0F9FF', border: '1px solid #0EA5E9' }}>
+            <Typography variant="h6" fontWeight={800} mb={3} color="#0EA5E9">
+              Complete Your Booking
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mb={3}>
+              Your booking is pending verification. Scan the QR code or use the link below to complete the payment and secure your reservation.
+            </Typography>
+
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <Typography variant="subtitle2" fontWeight={700} mb={2}>
+                    Scan QR Code
+                  </Typography>
+                  <Box sx={{
+                    bgcolor: 'white',
+                    p: 2,
+                    borderRadius: 2,
+                    border: '1px solid #E2E8F0',
+                    display: 'inline-block'
+                  }}>
+                    <QRCode
+                      value={`${window.location.origin}/booking?carId=${booking.carId}&bookingId=${booking.id}`}
+                      size={120}
+                    />
+                  </Box>
+                </Box>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <Typography variant="subtitle2" fontWeight={700} mb={2}>
+                    Or Use This Link
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    value={`${window.location.origin}/booking?carId=${booking.carId}&bookingId=${booking.id}`}
+                    InputProps={{
+                      readOnly: true,
+                      endAdornment: (
+                        <IconButton
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.origin}/booking?carId=${booking.carId}&bookingId=${booking.id}`);
+                            // You could add a toast notification here
+                          }}
+                          size="small"
+                        >
+                          <LinkIcon />
+                        </IconButton>
+                      ),
+                    }}
+                    sx={{ mb: 3 }}
+                  />
+
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} width="100%">
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      startIcon={<EditIcon />}
+                      onClick={() => {
+                        onClose();
+                        router.push(`/booking?carId=${booking.carId}&bookingId=${booking.id}`);
+                      }}
+                      sx={{
+                        bgcolor: '#0EA5E9',
+                        '&:hover': { bgcolor: '#0284C7' }
+                      }}
+                    >
+                      Change Details
+                    </Button>
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      color="error"
+                      onClick={() => onCancelBooking(booking.id)}
+                    >
+                      Cancel Booking
+                    </Button>
+                  </Stack>
+                </Box>
+              </Grid>
+            </Grid>
+          </Paper>
+        )}
+
+        {/* Other Status Info */}
+        {booking.status !== 'DRAFT' && booking.status !== 'AWAITING_VERIFICATION' && booking.status !== 'PENDING' && (
           <Alert severity="info" sx={{ borderRadius: 3 }}>
             <Typography variant="caption" fontWeight={700}>Status: {booking.status}</Typography>
             <Typography variant="body2">

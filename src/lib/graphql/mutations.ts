@@ -104,7 +104,7 @@ export const UPDATE_CAR_MUTATION = gql`
       status
       dailyKmLimit
       extraKmCharge
-      currentMileage
+      currentOdometer
       updatedAt
     }
   }
@@ -122,7 +122,7 @@ export const ADD_CAR_IMAGE_MUTATION = gql`
   mutation AddCarImage($carId: ID!, $file: Upload!, $isPrimary: Boolean) {
     addCarImage(carId: $carId, file: $file, isPrimary: $isPrimary) {
       id
-      imagePath
+      url
     }
   }
 `;
@@ -147,10 +147,36 @@ export const CREATE_BOOKING_MUTATION = gql`
       id
       status
       totalPrice
-      allowedKm
       depositAmount
       bookingType
       repairOrderId
+    }
+  }
+`;
+
+export const CONFIRM_RESERVATION_MUTATION = gql`
+  mutation ConfirmReservation($id: ID!) {
+    confirmReservation(id: $id) {
+      id
+      status
+      verification {
+        id
+        token
+        expiresAt
+        isVerified
+      }
+      startDate
+      endDate
+      totalPrice
+      car {
+        brand { name }
+        model { name }
+        plateNumber
+      }
+      user {
+        fullName
+        email
+      }
     }
   }
 `;
@@ -239,23 +265,16 @@ export const CANCEL_BOOKING_MUTATION = gql`
 `;
 
 export const PROCESS_DOCUMENT_OCR_MUTATION = gql`
-  mutation ProcessDocumentOCR($file: Upload!, $documentType: String, $side: String) {
+  mutation ProcessDocumentOCR($file: Upload!, $documentType: DocumentType, $side: DocumentSide) {
     processDocumentOCR(file: $file, documentType: $documentType, side: $side) {
-      firstName
-      lastName
       fullName
-      documentId
       licenseNumber
       expiryDate
-      documentDate
-      issueDate
       birthDate
       address
       licenseCategory
-      licenseCategories
-      restrictsToAutomatic
-      fallbackUsed
       isQuotaExceeded
+      fallbackUsed
     }
   }
 `;
@@ -278,8 +297,7 @@ export const FINALIZE_BOOKING_RETURN_MUTATION = gql`
     finalizeBookingReturn(bookingId: $bookingId) {
       id
       endMeter
-      extraKmUsed
-      extraKmCharge
+      extraKmFee
       totalFinalPrice
       status
     }
@@ -329,19 +347,21 @@ export const VERIFY_DRIVER_PROFILE_MUTATION = gql`
 // --- 🏷️ INVENTORY (BRAND & MODEL) ---
 
 export const CREATE_BRAND_MUTATION = gql`
-  mutation CreateBrand($name: String!, $logoUrl: String, $logoPublicId: String) {
-    createBrand(name: $name, logoUrl: $logoUrl, logoPublicId: $logoPublicId) {
+  mutation CreateBrand($name: String!, $logoUrl: String) {
+    createBrand(name: $name, logoUrl: $logoUrl) {
       id
       name
+      logoUrl
     }
   }
 `;
 
 export const UPDATE_BRAND_MUTATION = gql`
-  mutation UpdateBrand($id: ID!, $name: String!, $logoUrl: String, $logoPublicId: String) {
-    updateBrand(id: $id, name: $name, logoUrl: $logoUrl, logoPublicId: $logoPublicId) {
+  mutation UpdateBrand($id: ID!, $name: String!, $logoUrl: String) {
+    updateBrand(id: $id, name: $name, logoUrl: $logoUrl) {
       id
       name
+      logoUrl
     }
   }
 `;

@@ -6,24 +6,29 @@ export const GET_ME_QUERY = gql`
   query GetMe {
     me {
       id
-      username
+      fullName
       email
       phoneNumber
-      isEmailVerified
+      dateOfBirth
+      fullAddress
       role
-      driverProfile {
+      verification {
         id
         status
         licenseNumber
         licenseCategory
         licenseExpiry
-        dateOfBirth
-        address
+        idNumber
+        idExpiry
         licenseFrontUrl
         licenseBackUrl
-        idProofUrl
+        idCardUrl
         addressProofUrl
-        verificationNote
+        rejectionReason
+        aiMetadata
+        verifiedAt
+        createdAt
+        updatedAt
       }
     }
   }
@@ -36,50 +41,40 @@ export const GET_MY_BOOKINGS_QUERY = gql`
       createdAt
       startDate
       endDate
+      pickupTime
+      returnTime
 
-      # Meter Tracking & KM Management
-      startMeter
-      endMeter
-      allowedKm
-      extraKmUsed
-      extraKmCharge
+      # Meter Tracking
+      startOdometer
+      endOdometer
+      
+      # Corrected Field Name
+      extraKmFee 
 
       # Financials
       totalPrice
-      totalFinalPrice
       basePrice
       taxAmount
       depositAmount
-      surchargeAmount
 
       status
-      rentalType
       bookingType
       repairOrderId
-      pickupLocation
-      dropoffLocation
       car {
         brand { name }
         model { name }
         plateNumber
         dailyKmLimit
         extraKmCharge
+        requiredLicense
         images {
-          imagePath
+          url
           isPrimary
         }
-        requiredLicenseCategory
       }
       payment {
         status
         amount
-      }
-      verification {
-        id
-        token
-        expiresAt
-        isVerified
-        verifiedAt
       }
     }
   }
@@ -92,30 +87,23 @@ export const GET_ALL_BOOKINGS_QUERY = gql`
       startDate
       endDate
 
-      # Meter Tracking & KM Management
-      startMeter
-      endMeter
-      allowedKm
-      extraKmUsed
-      extraKmCharge
+      # Meter Tracking
+      startOdometer
+      endOdometer
+      extraKmFee 
 
       # Financials
       totalPrice
-      totalFinalPrice
       basePrice
       taxAmount
       depositAmount
-      surchargeAmount
 
       status
-      rentalType
       bookingType
       repairOrderId
-      pickupLocation
-      dropoffLocation
       user {
         id
-        username
+        fullName
         email
         phoneNumber
       }
@@ -125,19 +113,15 @@ export const GET_ALL_BOOKINGS_QUERY = gql`
         plateNumber
         dailyKmLimit
         extraKmCharge
+        requiredLicense
         images {
-          imagePath
+          url
           isPrimary
         }
-        requiredLicenseCategory
       }
       payment {
         status
         amount
-      }
-      verification {
-        isVerified
-        expiresAt
       }
     }
   }
@@ -149,30 +133,27 @@ export const GET_CARS_QUERY = gql`
   query GetCars($filter: CarFilterInput) {
     cars(filter: $filter) {
       id
+      plateNumber
       brand { id name }
       model { id name }
       year
       fuelType
       transmission
       seats
-      mileage
+      requiredLicense
 
-      requiredLicenseCategory
-
-      # KM Limits & Meter Tracking
+      # Car Specs
       dailyKmLimit
       extraKmCharge
-      currentMileage
+      currentOdometer
 
       depositAmount
       pricePerDay
-      pricePerHour
       critAirRating
       status
       images {
         id
-        imagePath
-        altText
+        url
         isPrimary
       }
     }
@@ -183,35 +164,30 @@ export const GET_CAR_QUERY = gql`
   query GetCar($id: ID!) {
     car(id: $id) {
       id
-      brand { id name logoUrl }
+      brand { id name }
       model { id name }
       year
       plateNumber
       fuelType
       transmission
       seats
-      mileage
+      requiredLicense
 
-      requiredLicenseCategory
-
-      # KM Limits & Meter Tracking
       dailyKmLimit
       extraKmCharge
-      currentMileage
+      currentOdometer
 
       depositAmount
-      pricePerHour
       pricePerDay
       critAirRating
       status
-      descriptionEn
-      descriptionFr
       images {
         id
-        imagePath
-        altText
+        url
         isPrimary
       }
+      createdAt
+      updatedAt
     }
   }
 `;
@@ -225,14 +201,12 @@ export const GET_AVAILABLE_CARS_QUERY = gql`
       year
       fuelType
       transmission
-      seats
+      requiredLicense
       pricePerDay
-      pricePerHour
       images {
-        imagePath
+        url
         isPrimary
       }
-      requiredLicenseCategory
     }
   }
 `;
@@ -244,7 +218,7 @@ export const GET_CAR_ENUMS = gql`
     fuelTypeEnum: __type(name: "FuelType") {
       enumValues { name }
     }
-    transmissionEnum: __type(name: "TransmissionType") {
+    transmissionEnum: __type(name: "Transmission") {
       enumValues { name }
     }
     critAirEnum: __type(name: "CritAirCategory") {
@@ -264,8 +238,6 @@ export const GET_PLATFORM_SETTINGS_QUERY = gql`
     platformSettings {
       id
       companyName
-      description
-      logoUrl
       currency
       taxPercentage
       youngDriverMinAge
@@ -273,10 +245,6 @@ export const GET_PLATFORM_SETTINGS_QUERY = gql`
       supportPhone
       supportEmail
       address
-      facebookUrl
-      twitterUrl
-      instagramUrl
-      linkedinUrl
     }
   }
 `;
@@ -306,39 +274,34 @@ export const GET_BOOKING_QUERY = gql`
       id
       startDate
       endDate
+      pickupTime
+      returnTime
 
       user {
         id
-        driverProfile {
+        verification {
           status
           licenseFrontUrl
           licenseBackUrl
-          idProofUrl
+          idCardUrl
           addressProofUrl
         }
       }
 
-      # Meter Tracking & KM Management
-      startMeter
-      endMeter
-      allowedKm
-      extraKmUsed
-      extraKmCharge
+      # Meter Tracking
+      startOdometer
+      endOdometer
+      extraKmFee
 
       # Financials
       totalPrice
-      totalFinalPrice
       basePrice
       taxAmount
       depositAmount
-      surchargeAmount
 
       status
-      rentalType
       bookingType
       repairOrderId
-      pickupLocation
-      dropoffLocation
       car {
         id
         brand { name }
@@ -346,28 +309,19 @@ export const GET_BOOKING_QUERY = gql`
         plateNumber
         fuelType
         transmission
-        seats
-        requiredLicenseCategory
+        requiredLicense
         dailyKmLimit
         extraKmCharge
         pricePerDay
-        pricePerHour
         depositAmount
         images {
-          imagePath
+          url
           isPrimary
         }
       }
       payment {
         status
         amount
-      }
-      verification {
-        id
-        token
-        expiresAt
-        isVerified
-        verifiedAt
       }
     }
   }
@@ -382,7 +336,7 @@ export const CHECK_CAR_AVAILABILITY_QUERY = gql`
         startDate
         endDate
         user {
-          username
+          fullName
         }
       }
     }
@@ -391,9 +345,64 @@ export const CHECK_CAR_AVAILABILITY_QUERY = gql`
 
 export const GET_BOOKING_ID_BY_TOKEN_QUERY = gql`
   query GetBookingIdByToken($token: String!) {
-    verifyBookingToken(token: $token) {
-      success
-      bookingId
+    bookingByToken(token: $token) {
+      id
+      status
+    }
+  }
+`;
+
+export const GET_BOOKING_BY_TOKEN_QUERY = gql`
+  query GetBookingByToken($token: String!) {
+    bookingByToken(token: $token) {
+      id
+      startDate
+      endDate
+      startOdometer
+      endOdometer
+      extraKmFee
+      
+      totalPrice
+      basePrice
+      taxAmount
+      depositAmount
+      status
+      bookingType
+      repairOrderId
+      verification {
+        id
+        token
+        expiresAt
+        isVerified
+        verifiedAt
+      }
+      user {
+        id
+        fullName
+        email
+        phoneNumber
+      }
+      car {
+        id
+        brand { name }
+        model { name }
+        plateNumber
+        fuelType
+        transmission
+        requiredLicense
+        dailyKmLimit
+        extraKmCharge
+        pricePerDay
+        depositAmount
+        images {
+          url
+          isPrimary
+        }
+      }
+      payment {
+        status
+        amount
+      }
     }
   }
 `;

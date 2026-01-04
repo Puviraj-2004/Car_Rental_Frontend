@@ -4,10 +4,11 @@ import React, { useState } from 'react';
 import {
   AppBar, Toolbar, Typography, Button, Box, IconButton,
   Drawer, List, ListItem, ListItemButton, ListItemText, MenuItem, Menu,
-  Avatar, Tooltip, Divider, Container
+  Avatar, Tooltip, Container, Stack
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
+import SearchIcon from '@mui/icons-material/Search';
 import DriveEtaIcon from '@mui/icons-material/DriveEta';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
@@ -47,272 +48,253 @@ export default function Navbar() {
 
   const navItems = [
     { label: 'Home', path: '/' },
-    { label: 'Fleet', path: '/cars' },
-    { label: 'About', path: '/about' },
+    { label: 'About Us', path: '/about' },
+    { label: 'Our Fleet', path: '/cars' },
   ];
 
   return (
     <>
-      <AppBar position="fixed" sx={{ backgroundColor: '#0F172A', color: 'white', boxShadow: 3 }}>
+      <AppBar 
+        position="fixed" 
+        elevation={0} 
+        sx={{ 
+          backgroundColor: '#FFFFFF', 
+          color: '#1E293B', 
+          borderBottom: '1px solid #F1F5F9',
+          height: 80,
+          justifyContent: 'center'
+        }}
+      >
         <Container maxWidth="xl">
-          <Toolbar disableGutters>
+          <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
 
-            {/* --- Mobile Layout: Menu (Left) + Brand (Center) + Login (Right) --- */}
-            <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', width: '100%' }}>
-              {/* Mobile Menu Icon - Left */}
-              <Box sx={{ flexGrow: 0 }}>
-                <IconButton color="inherit" onClick={() => setMobileOpen(true)}>
-                  <MenuIcon />
-                </IconButton>
-              </Box>
-
-              {/* Mobile Brand Name - Center */}
-              <Box sx={{ flexGrow: 1, textAlign: 'center' }}>
-                <Typography
-                  variant="h6"
-                  noWrap
-                  sx={{
-                    fontFamily: 'monospace',
-                    fontWeight: 700,
-                    letterSpacing: '.1rem',
-                    color: 'inherit',
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => router.push('/')}
-                >
-                  {settings.companyName || 'RENTCAR'}
-                </Typography>
-              </Box>
-
-              {/* Mobile User Section - Right */}
-              <Box sx={{ flexGrow: 0 }}>
-                {!isLoggedIn ? (
-                  <Button
-                    variant="contained"
-                    color="secondary"
-                    onClick={() => router.push('/login')}
-                    sx={{
-                      borderRadius: '20px',
-                      fontWeight: 'bold',
-                      px: 2,
-                      py: 1,
-                      textTransform: 'none',
-                      boxShadow: '0 4px 14px 0 rgba(37, 99, 235, 0.39)',
-                      fontSize: '0.875rem'
-                    }}
-                  >
-                    Login
-                  </Button>
-                ) : (
-                  <Tooltip title="Account Settings">
-                    <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-                      <Avatar
-                        sx={{
-                          bgcolor: '#2563EB',
-                          border: '2px solid white',
-                          fontWeight: 'bold'
-                        }}
-                      >
-                        {session?.user?.name ? session.user.name[0].toUpperCase() : (userData?.me?.firstName ? userData.me.firstName[0].toUpperCase() : 'U')}
-                      </Avatar>
-                    </IconButton>
-                  </Tooltip>
-                )}
-              </Box>
-            </Box>
-
-            {/* --- Desktop Layout --- */}
-            <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
-              {/* Desktop: LOGO & NAME */}
-              <Box
-                sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
-                onClick={() => router.push('/')}
+            {/* 1. BRAND / LOGO (Left) */}
+            <Box 
+              sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 1 }}
+              onClick={() => router.push('/')}
+            >
+              {settings.logoUrl ? (
+                <Box component="img" src={settings.logoUrl} alt="Logo" sx={{ height: 40 }} />
+              ) : (
+                <DriveEtaIcon sx={{ fontSize: 32, color: '#0F172A' }} />
+              )}
+              <Typography
+                variant="h5"
+                noWrap
+                sx={{
+                  fontFamily: 'inherit',
+                  fontWeight: 700,
+                  color: '#0F172A',
+                  letterSpacing: '-0.5px'
+                }}
               >
-                {settings.logoUrl ? (
-                  <Box
-                    component="img"
-                    src={settings.logoUrl}
-                    alt="Logo"
-                    sx={{ height: 40, mr: 1 }}
-                  />
-                ) : (
-                  <DriveEtaIcon sx={{ mr: 1, fontSize: 30, color: '#60A5FA' }} />
-                )}
-                <Typography
-                  variant="h6"
-                  noWrap
-                  sx={{
-                    fontFamily: 'monospace',
-                    fontWeight: 700,
-                    letterSpacing: '.1rem',
-                    color: 'inherit',
-                    textDecoration: 'none',
-                  }}
-                >
-                  {settings.companyName || 'RENTCAR'}
-                </Typography>
-              </Box>
+                {settings.companyName || 'Dream Drive'}
+              </Typography>
+            </Box>
 
-              {/* Desktop Links */}
-              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, flexGrow: 1 }}>
-                {navItems.map((item) => (
-                  <Button
-                    key={item.path}
-                    component={Link}
-                    href={item.path}
-                    sx={{
-                      my: 2,
-                      color: 'white',
-                      display: 'block',
-                      textTransform: 'none',
-                      fontSize: '1rem',
-                      borderBottom: pathname === item.path ? '2px solid #3b82f6' : '2px solid transparent',
-                      borderRadius: 0,
-                      '&:hover': { borderBottom: '2px solid #60a5fa' }
-                    }}
-                  >
-                    {item.label}
-                  </Button>
-                ))}
-              </Box>
-
-              {/* Desktop User Section */}
-              <Box sx={{ flexGrow: 0 }}>
-                {!isLoggedIn ? (
-                  <Button
-                    variant="contained"
-                    color="secondary"
-                    onClick={() => router.push('/login')}
-                    sx={{
-                      borderRadius: '20px',
-                      fontWeight: 'bold',
-                      px: 3,
-                      textTransform: 'none',
-                      boxShadow: '0 4px 14px 0 rgba(37, 99, 235, 0.39)'
-                    }}
-                  >
-                    Login
-                  </Button>
-                ) : (
-                  <Tooltip title="Account Settings">
-                    <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-                      <Avatar
-                        sx={{
-                          bgcolor: '#2563EB',
-                          border: '2px solid white',
-                          fontWeight: 'bold'
-                        }}
-                      >
-                        {session?.user?.name ? session.user.name[0].toUpperCase() : (userData?.me?.firstName ? userData.me.firstName[0].toUpperCase() : 'U')}
-                      </Avatar>
-                    </IconButton>
-                  </Tooltip>
-                )}
+            {/* 2. CENTER NAVIGATION (Desktop) - Pill Style */}
+            <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center' }}>
+              <Box 
+                sx={{ 
+                  bgcolor: '#F8FAFC', 
+                  borderRadius: '100px', 
+                  p: 0.75, 
+                  display: 'flex', 
+                  gap: 0.5,
+                  border: '1px solid #E2E8F0'
+                }}
+              >
+                {navItems.map((item) => {
+                  const isActive = pathname === item.path;
+                  return (
+                    <Button
+                      key={item.path}
+                      component={Link}
+                      href={item.path}
+                      sx={{
+                        borderRadius: '100px',
+                        px: 3,
+                        py: 1,
+                        textTransform: 'none',
+                        fontSize: '0.9rem',
+                        fontWeight: isActive ? 600 : 500,
+                        color: isActive ? 'white' : '#64748B',
+                        bgcolor: isActive ? '#0F172A' : 'transparent',
+                        '&:hover': {
+                          bgcolor: isActive ? '#0F172A' : '#E2E8F0',
+                          color: isActive ? 'white' : '#1E293B'
+                        }
+                      }}
+                    >
+                      {item.label}
+                    </Button>
+                  );
+                })}
               </Box>
             </Box>
+
+            {/* 3. RIGHT SECTION (Search + Login/User) */}
+            <Stack direction="row" spacing={1} alignItems="center">
+
+              {/* Login / Profile */}
+              {!isLoggedIn ? (
+                <Button
+                  variant="contained"
+                  onClick={() => router.push('/login')}
+                  sx={{
+                    bgcolor: '#0F172A',
+                    color: 'white',
+                    borderRadius: '100px',
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    px: 4,
+                    py: 1.2,
+                    boxShadow: 'none',
+                    display: { xs: 'none', md: 'block' },
+                    '&:hover': {
+                      bgcolor: '#334155',
+                      boxShadow: 'none'
+                    }
+                  }}
+                >
+                  Login
+                </Button>
+              ) : (
+                <Tooltip title="Account Settings">
+                  <IconButton onClick={handleOpenUserMenu} sx={{ p: 0, ml: 1 }}>
+                    <Avatar
+                      sx={{
+                        bgcolor: '#0F172A',
+                        color: 'white',
+                        fontWeight: 'bold',
+                        width: 40,
+                        height: 40
+                      }}
+                    >
+                      {session?.user?.name ? session.user.name[0].toUpperCase() : (userData?.me?.firstName ? userData.me.firstName[0].toUpperCase() : 'U')}
+                    </Avatar>
+                  </IconButton>
+                </Tooltip>
+              )}
+
+              {/* Mobile Menu Toggle */}
+              <IconButton 
+                sx={{ display: { xs: 'flex', md: 'none' }, color: '#0F172A' }}
+                onClick={() => setMobileOpen(true)}
+              >
+                <MenuIcon />
+              </IconButton>
+            </Stack>
+
           </Toolbar>
         </Container>
       </AppBar>
 
-      {/* User Menu */}
+      {/* User Dropdown Menu */}
       <Menu
-        sx={{ mt: '45px' }}
+        sx={{ mt: '50px' }}
         anchorEl={anchorElUser}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         keepMounted
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         open={Boolean(anchorElUser)}
         onClose={handleCloseUserMenu}
+        PaperProps={{
+          elevation: 0,
+          sx: {
+            overflow: 'visible',
+            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.1))',
+            mt: 1.5,
+            borderRadius: 3,
+            minWidth: 200,
+            border: '1px solid #F1F5F9'
+          },
+        }}
       >
-        <Box sx={{ px: 2, py: 1.5, minWidth: '180px' }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+        <Box sx={{ px: 2.5, py: 2 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0F172A' }}>
             {userData?.me?.firstName} {userData?.me?.lastName}
           </Typography>
           <Typography variant="caption" color="text.secondary">
             {userData?.me?.email}
           </Typography>
         </Box>
-
-        <Divider />
-
-        <MenuItem onClick={() => { router.push('/bookingRecords'); handleCloseUserMenu(); }}>
-          <ListItemText>My Bookings</ListItemText>
+        <Box sx={{ height: 1, bgcolor: '#F1F5F9', my: 1 }} />
+        <MenuItem onClick={() => { router.push('/bookingRecords'); handleCloseUserMenu(); }} sx={{ py: 1.5 }}>
+          <ListItemText primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }}>My Bookings</ListItemText>
         </MenuItem>
-
-        <MenuItem onClick={() => { router.push('/profile'); handleCloseUserMenu(); }}>
-          <ListItemText>Profile Settings</ListItemText>
+        <MenuItem onClick={() => { router.push('/profile'); handleCloseUserMenu(); }} sx={{ py: 1.5 }}>
+          <ListItemText primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }}>Profile Settings</ListItemText>
         </MenuItem>
-
-        <Divider />
-
-        <MenuItem onClick={handleLogout}>
-          <Typography color="error" fontWeight="medium">Logout</Typography>
+        <Box sx={{ height: 1, bgcolor: '#F1F5F9', my: 1 }} />
+        <MenuItem onClick={handleLogout} sx={{ py: 1.5 }}>
+          <Typography color="error" fontSize="0.9rem" fontWeight={600}>Logout</Typography>
         </MenuItem>
       </Menu>
 
-      {/* --- Mobile Drawer --- */}
+      {/* Mobile Drawer */}
       <Drawer
-        anchor="left"
+        anchor="right"
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
-        sx={{ '& .MuiDrawer-paper': { width: 280, bgcolor: '#0F172A', color: 'white' } }}
+        sx={{ '& .MuiDrawer-paper': { width: '100%', maxWidth: 300, bgcolor: 'white' } }}
       >
-        <Box sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            {/* Brand Logo and Name */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              {settings.logoUrl ? (
-                <Box
-                  component="img"
-                  src={settings.logoUrl}
-                  alt="Logo"
-                  sx={{ height: 40, width: 40, borderRadius: 1 }}
-                />
-              ) : (
-                <DriveEtaIcon sx={{ fontSize: 40, color: '#60A5FA' }} />
-              )}
-              <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                {settings.companyName || 'RENTCAR'}
-              </Typography>
-            </Box>
-            <IconButton onClick={() => setMobileOpen(false)} color="inherit" size="small">
+        <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+            <Typography variant="h6" fontWeight={700} color="#0F172A">
+              Menu
+            </Typography>
+            <IconButton onClick={() => setMobileOpen(false)} color="inherit">
               <CloseIcon />
             </IconButton>
           </Box>
 
-          <Divider sx={{ bgcolor: 'rgba(255,255,255,0.1)', mb: 3 }} />
-
-          <List sx={{ pt: 1 }}>
+          <List sx={{ flexGrow: 1 }}>
             {navItems.map((item) => (
-              <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
+              <ListItem key={item.path} disablePadding sx={{ mb: 2 }}>
                 <ListItemButton
                   component={Link}
                   href={item.path}
                   onClick={() => setMobileOpen(false)}
                   sx={{
                     borderRadius: 2,
-                    bgcolor: pathname === item.path ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
-                    '&:hover': { bgcolor: 'rgba(59, 130, 246, 0.1)' }
+                    bgcolor: pathname === item.path ? '#F8FAFC' : 'transparent',
                   }}
                 >
                   <ListItemText
                     primary={item.label}
-                    sx={{
-                      '& .MuiListItemText-primary': {
-                        fontWeight: pathname === item.path ? 600 : 400,
-                        color: pathname === item.path ? '#60A5FA' : 'white'
-                      }
+                    primaryTypographyProps={{
+                      fontSize: '1.1rem',
+                      fontWeight: pathname === item.path ? 700 : 500,
+                      color: '#0F172A'
                     }}
                   />
                 </ListItemButton>
               </ListItem>
             ))}
           </List>
+
+          {!isLoggedIn && (
+            <Button
+              fullWidth
+              variant="contained"
+              onClick={() => { router.push('/login'); setMobileOpen(false); }}
+              sx={{
+                bgcolor: '#0F172A',
+                color: 'white',
+                borderRadius: '12px',
+                py: 2,
+                fontSize: '1rem',
+                fontWeight: 700,
+                textTransform: 'none'
+              }}
+            >
+              Login
+            </Button>
+          )}
         </Box>
       </Drawer>
-
-      {/* Navbar Fixed என்பதால் கீழே வரும் கன்டென்ட் மறையாமல் இருக்க ஒரு ஸ்பேசர் */}
-      <Toolbar />
+      <Toolbar sx={{ height: 80 }} />
     </>
   );
 }

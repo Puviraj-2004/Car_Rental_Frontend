@@ -1,15 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn, getSession } from 'next-auth/react';
 import {
   Box, Typography, TextField, Button, InputAdornment, 
   Link, Divider, IconButton, Alert, Stack, Grid, CircularProgress
 } from '@mui/material';
 import {
-  EmailOutlined, LockOutlined, Google, Facebook, Apple, 
-  Visibility, VisibilityOff, DirectionsCar, MapOutlined
+  EmailOutlined, LockOutlined, Google, Facebook,
+  Visibility, VisibilityOff, DirectionsCar
 } from '@mui/icons-material';
 
 // COLOR PALETTE
@@ -25,7 +25,7 @@ const COLORS = {
 
 export default function UserLoginPage() {
   const router = useRouter();
-  const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+  const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect') || searchParams.get('callbackUrl') || '/';
 
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -49,11 +49,8 @@ export default function UserLoginPage() {
       setError('Invalid email or password. Please try again.');
       setLoading(false);
     } else {
-      console.log('✅ Login successful, getting session...');
 
-      // 🚀 லாகின் ஆன பிறகு செஷனை எடுத்து ரோலைச் சரிபார்க்கவும்
-      const session = await getSession();
-      console.log('🔑 Session after login:', {
+      const session = await getSession();({
         hasSession: !!session,
         hasUser: !!session?.user,
         userRole: (session?.user as any)?.role,
@@ -146,11 +143,12 @@ export default function UserLoginPage() {
 
                 <Box>
                   <Typography variant="caption" fontWeight="700" sx={{ mb: 0.5, display: 'block', ml: 1 }}>Password</Typography>
-                  <TextField 
+                  <TextField
                     fullWidth placeholder="••••••••" type={showPassword ? 'text' : 'password'} sx={inputStyles}
-                    autoComplete="new-password"
-                    value={formData.password} 
+                    autoComplete="current-password"
+                    value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    suppressHydrationWarning
                     InputProps={{
                       startAdornment: <InputAdornment position="start"><LockOutlined fontSize="small" /></InputAdornment>,
                       endAdornment: (

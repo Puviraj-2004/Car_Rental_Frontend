@@ -1,43 +1,35 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
-import dayjs from 'dayjs';
 import {
-  parseUrlDateParams,
-  isValidDateTime,
   formatDateForDisplay,
   formatTimeForDisplay,
   generateTimeOptions,
   getMinPickupDate,
-  isValidDateRange,
-  DateTimeComponents,
-  isValidDateValue,
   generateDefaultBookingDates
 } from '@/lib/dateUtils';
 import {
   Box, Container, Typography, Paper, Grid, Button, TextField,
-  Card, CardContent, CardMedia, Stack, Divider, Alert,
+  Card, Stack, Divider, Alert,
   CircularProgress, Chip, Dialog, DialogTitle, DialogContent,
-  DialogActions, FormControl, InputLabel, Select, MenuItem,
-  IconButton
+  MenuItem, DialogActions, IconButton, useTheme, CardMedia, CardActionArea, Snackbar
 } from '@mui/material';
-import { MenuItem as MuiMenuItem } from '@mui/material';
 import {
-  DirectionsCar, AccessTime, CheckCircle, Warning, Info,
-  Event, Schedule, Euro, VerifiedUser, Security, Settings, LocalGasStation,
-  ArrowBack, Edit
+  AccessTime, CheckCircle, Settings, LocalGasStation,
+  ArrowBack, Edit, EventSeat, ContentCopy, CalendarMonth,
+  LocationOn, Shield, WarningAmber, Close, AccessAlarm
 } from '@mui/icons-material';
 import dynamic from 'next/dynamic';
 
+// Dynamic QR Code Import
 const QRCode = dynamic(() => import('react-qr-code'), {
   ssr: false,
-  loading: () => <div>Loading QR Code...</div>
+  loading: () => <Box sx={{ height: 180, width: 180, bgcolor: '#f0f0f0', borderRadius: 2 }} />
 });
 
-// GraphQL Queries & Mutations
 import {
   GET_CAR_QUERY,
   GET_ME_QUERY,
@@ -48,1105 +40,532 @@ import {
 } from '@/lib/graphql/queries';
 import {
   CREATE_BOOKING_MUTATION,
-  CONFIRM_BOOKING_MUTATION,
-  UPDATE_BOOKING_STATUS_MUTATION,
-  SEND_VERIFICATION_LINK_MUTATION
+  CONFIRM_RESERVATION_MUTATION,
 } from '@/lib/graphql/mutations';
 
-export default function BookingPage() {
+function BookingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
-  const client = useApolloClient();
-
-  // URL Parameters
+  
+  // --- 1. INITIALIZATION ---
   const carId = searchParams.get('carId');
   const bookingId = searchParams.get('bookingId') || null;
 
+  const getInitialDate = (key: string) => {
+    if (typeof window === 'undefined') return '';
+    const val = new URLSearchParams(window.location.search).get(key);
+    return (val && val.includes('T')) ? val.split('T')[0] : '';
+  };
 
-  // Validate required parameters
-  const hasRequiredParams = carId || bookingId;
-  if (!hasRequiredParams && status !== 'loading') {
-    console.error('Missing required parameters: carId or bookingId');
-    router.push('/cars');
-    return null;
-  }
+  const getInitialTime = (key: string) => {
+    if (typeof window === 'undefined') return '';
+    const val = new URLSearchParams(window.location.search).get(key);
+    return (val && val.includes('T')) ? val.split('T')[1].substring(0, 5) : '';
+  };
 
-  // Parse URL parameters using industrial date utilities
-  const startParam = searchParams.get('start');
-  const endParam = searchParams.get('end');
+  const [startDate, setStartDate] = useState(() => getInitialDate('start'));
+  const [startTime, setStartTime] = useState(() => getInitialTime('start'));
+  const [endDate, setEndDate] = useState(() => getInitialDate('end'));
+  const [endTime, setEndTime] = useState(() => getInitialTime('end'));
 
-  // Debug URL parameters
-  console.log('URL Parameter Debug:', {
-    startParam,
-    endParam,
-    searchParams: Object.fromEntries(searchParams.entries())
-  });
+  const startDateTime = startDate && startTime ? `${startDate}T${startTime}:00` : '';
+  const endDateTime = endDate && endTime ? `${endDate}T${endTime}:00` : '';
 
-  const { start: urlStartDate, end: urlEndDate } = parseUrlDateParams(startParam, endParam);
+  const hasDates = !!(startDate && startTime && endDate && endTime);
 
-  // Generate default dates if URL params are not available
-  const defaultDates = generateDefaultBookingDates();
-
-  console.log('Parsed URL dates:', { urlStartDate, urlEndDate });
-
-  // Initialize date/time state with URL params or defaults
-  const initialStartDate = urlStartDate?.date || defaultDates.start.date;
-  const initialStartTime = urlStartDate?.time || defaultDates.start.time;
-  const initialEndDate = urlEndDate?.date || defaultDates.end.date;
-  const initialEndTime = urlEndDate?.time || defaultDates.end.time;
-
-  console.log('Final initial state values:', {
-    initialStartDate,
-    initialStartTime,
-    initialEndDate,
-    initialEndTime,
-    usedDefaults: !urlStartDate
-  });
-
-  const [startDate, setStartDate] = useState(initialStartDate);
-  const [startTime, setStartTime] = useState(initialStartTime);
-  const [endDate, setEndDate] = useState(initialEndDate);
-  const [endTime, setEndTime] = useState(initialEndTime);
-
-  // Combine date and time for datetime calculations with validation
-  const startDateTime = startDate && startTime ? `${startDate}T${startTime}` : '';
-  const endDateTime = endDate && endTime ? `${endDate}T${endTime}` : '';
-
-  // Generate time options using utility function
-  const timeOptions = generateTimeOptions();
-  // UI States
-  const [verificationDialog, setVerificationDialog] = useState(false);
-  const [availabilityError, setAvailabilityError] = useState(false);
+  // States
+  const [isCarAvailable, setIsCarAvailable] = useState(true);
   const [changeCarDialog, setChangeCarDialog] = useState(false);
   const [emailVerificationPopup, setEmailVerificationPopup] = useState(false);
   const [confirmedBookingData, setConfirmedBookingData] = useState<any>(null);
   const [verificationTimer, setVerificationTimer] = useState<string>('60:00');
+  const [bookingType, setBookingType] = useState<'RENTAL' | 'REPLACEMENT'>('RENTAL');
+  const [copySuccess, setCopySuccess] = useState(false);
 
-  // Verification timer effect
-  useEffect(() => {
-    if (!emailVerificationPopup || !confirmedBookingData?.verification?.expiresAt) return;
+  // --- 2. QUERIES ---
+  const { data: userData } = useQuery(GET_ME_QUERY, { skip: !session });
+  const { data: platformData } = useQuery(GET_PLATFORM_SETTINGS_QUERY);
 
-    const interval = setInterval(() => {
-      const expiresAt = new Date(confirmedBookingData.verification.expiresAt);
-      const now = new Date();
-      const diff = expiresAt.getTime() - now.getTime();
-
-      if (diff <= 0) {
-        setVerificationTimer('EXPIRED');
-        clearInterval(interval);
-        return;
-      }
-
-      const minutes = Math.floor(diff / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-      setVerificationTimer(`${minutes}:${seconds.toString().padStart(2, '0')}`);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [emailVerificationPopup, confirmedBookingData]);
-
-  // GraphQL Queries
-  const { data: userData, error: userError } = useQuery(GET_ME_QUERY, {
-    skip: !session,
-    errorPolicy: 'all'
-  });
-  const { data: platformData, error: platformError } = useQuery(GET_PLATFORM_SETTINGS_QUERY, {
-    errorPolicy: 'all'
-  });
-
-  // Query for existing booking (if bookingId is provided)
-  const { data: bookingData, loading: bookingLoading, refetch: refetchBooking } = useQuery(GET_BOOKING_QUERY, {
+  const { data: bookingData, loading: bookingLoading } = useQuery(GET_BOOKING_QUERY, {
     variables: bookingId ? { id: bookingId } : undefined,
     skip: !bookingId,
-    fetchPolicy: 'cache-and-network'
+    fetchPolicy: 'network-only'
   });
 
-  // Car query - uses bookingData as fallback
   const carQueryId = carId || bookingData?.booking?.car?.id;
+
   const { data: carData, loading: carLoading } = useQuery(GET_CAR_QUERY, {
     variables: carQueryId ? { id: carQueryId } : undefined,
     skip: !carQueryId,
     fetchPolicy: 'cache-and-network'
   });
 
-  // Available rental types based on car pricing
-  const availableRentalTypes = useMemo(() => {
-    if (!carData?.car) return [];
+  const { data: availabilityData, loading: checkingAvailability } = useQuery(CHECK_CAR_AVAILABILITY_QUERY, {
+    variables: {
+      carId: carQueryId,
+      startDate: startDateTime ? new Date(startDateTime).toISOString() : new Date().toISOString(),
+      endDate: endDateTime ? new Date(endDateTime).toISOString() : new Date().toISOString()
+    },
+    skip: !carQueryId || !hasDates,
+    fetchPolicy: 'network-only'
+  });
 
-    const car = carData.car;
-    const types: { value: 'HOUR' | 'DAY' | 'KM'; label: string }[] = [];
-
-    if (car.pricePerHour && car.pricePerHour > 0) {
-      types.push({ value: 'HOUR', label: 'Hourly' });
-    }
-    if (car.pricePerDay && car.pricePerDay > 0) {
-      types.push({ value: 'DAY', label: 'Daily' });
-    }
-    if (car.pricePerKm && car.pricePerKm > 0) {
-      types.push({ value: 'KM', label: 'Per KM' });
-    }
-
-    return types;
-  }, [carData?.car]);
-
-  const [rentalType, setRentalType] = useState<'HOUR' | 'DAY' | 'KM'>('DAY');
-  const [bookingType, setBookingType] = useState<'RENTAL' | 'REPLACEMENT'>('RENTAL');
-
-  // Initialize rental type to first available when car data loads
-  useEffect(() => {
-    if (availableRentalTypes.length > 0 && !availableRentalTypes.find(type => type.value === rentalType)) {
-      setRentalType(availableRentalTypes[0].value);
-    }
-  }, [availableRentalTypes]);
-
-  // Auto-switch rental type based on selected duration
-  useEffect(() => {
-    if (!carData?.car || !startDateTime || !endDateTime) return;
-
-    const start = isValidDate(startDateTime) ? new Date(startDateTime) : new Date();
-    const end = isValidDate(endDateTime) ? new Date(endDateTime) : new Date();
-
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
-
-    // If duration < 24 hours and car has hourly pricing, switch to HOUR
-    // Otherwise, keep DAY (or switch to DAY if currently HOUR)
-    if (diffHours < 24 && carData.car.pricePerHour && carData.car.pricePerHour > 0) {
-      if (rentalType !== 'HOUR') {
-        setRentalType('HOUR');
-      }
-    } else {
-      if (rentalType !== 'DAY') {
-        setRentalType('DAY');
-      }
-    }
-  }, [startDateTime, endDateTime, carData?.car, rentalType]);
-
-  // Authentication & Redirect Logic
-  useEffect(() => {
-    if (status === 'loading') return;
-
-    if (status === 'unauthenticated') {
-      const currentUrl = window.location.pathname + window.location.search;
-      router.push(`/login?redirect=${encodeURIComponent(currentUrl)}`);
-    }
-  }, [status, router]);
-
-  // Validate date strings before using them
-  const isValidDate = (dateString: string) => {
-    if (!dateString) return false;
-    try {
-      const date = new Date(dateString);
-      return date instanceof Date && !isNaN(date.getTime());
-    } catch (error) {
-      console.error('Invalid date string:', dateString, error);
-      return false;
-    }
-  };
-
-  // Query for available cars (for change car functionality)
   const { data: availableCarsData, loading: availableCarsLoading } = useQuery(GET_AVAILABLE_CARS_QUERY, {
     variables: {
-      startDate: isValidDate(startDateTime) ? new Date(startDateTime).toISOString() : null,
-      endDate: isValidDate(endDateTime) ? new Date(endDateTime).toISOString() : null,
-      excludeCarId: carId
+      startDate: startDateTime ? new Date(startDateTime).toISOString() : new Date().toISOString(),
+      endDate: endDateTime ? new Date(endDateTime).toISOString() : new Date().toISOString(),
     },
-    skip: !isValidDate(startDateTime) || !isValidDate(endDateTime) || !changeCarDialog,
-    fetchPolicy: 'cache-and-network'
+    skip: !changeCarDialog || !hasDates,
+    fetchPolicy: 'network-only'
   });
 
-  // Check car availability when dates change
-  const { data: availabilityData, loading: availabilityLoading } = useQuery(CHECK_CAR_AVAILABILITY_QUERY, {
-    variables: {
-      carId: carId || bookingData?.booking?.car?.id,
-      startDate: isValidDate(startDateTime) ? new Date(startDateTime).toISOString() : null,
-      endDate: isValidDate(endDateTime) ? new Date(endDateTime).toISOString() : null
-    },
-    skip: !carId && !bookingData?.booking?.car?.id || !startDateTime || !endDateTime,
-    fetchPolicy: 'cache-and-network'
-  });
-
-  // GraphQL Mutations
   const [createBooking, { loading: createBookingLoading }] = useMutation(CREATE_BOOKING_MUTATION);
-  const [confirmBooking, { loading: confirmBookingLoading }] = useMutation(CONFIRM_BOOKING_MUTATION);
-  const [updateBookingStatus] = useMutation(UPDATE_BOOKING_STATUS_MUTATION);
-  const [sendVerification] = useMutation(SEND_VERIFICATION_LINK_MUTATION);
+  const [confirmReservation, { loading: confirmReservationLoading }] = useMutation(CONFIRM_RESERVATION_MUTATION);
 
-  // Populate form data from existing booking or URL parameters
+  // --- 3. LOGIC ---
+
   useEffect(() => {
-    console.log('Date population useEffect triggered:', {
-      startParam,
-      endParam,
-      hasBookingData: !!bookingData?.booking,
-      bookingId
-    });
+    if (availabilityData?.checkCarAvailability) {
+      setIsCarAvailable(availabilityData.checkCarAvailability.available);
+    }
+  }, [availabilityData]);
 
-    // Priority 1: Use URL parameters (from car listing page) if available and no existing booking
-    if (startParam && endParam && !bookingData?.booking) {
-      // URL parameters already set the initial state, no need to do anything
-      console.log('Using dates from URL parameters:', { startParam, endParam });
+  useEffect(() => {
+    if (bookingData?.booking) {
+      const booking = bookingData.booking;
+      if (booking.status === 'PENDING' && booking.verification?.token) {
+        setConfirmedBookingData(booking);
+        setEmailVerificationPopup(true);
+      }
+      
+      const rawStart = searchParams.get('start');
+      if (!rawStart && booking.startDate && booking.endDate) {
+         try {
+            const sDate = new Date(booking.startDate);
+            const eDate = new Date(booking.endDate);
+            if (!isNaN(sDate.getTime()) && !isNaN(eDate.getTime())) {
+                setStartDate(sDate.toISOString().split('T')[0]);
+                setStartTime(booking.pickupTime || '10:00');
+                setEndDate(eDate.toISOString().split('T')[0]);
+                setEndTime(booking.returnTime || '10:00');
+            }
+         } catch(e) {}
+      }
+      setBookingType(booking.bookingType);
+    }
+  }, [bookingData, searchParams]);
+
+  // 🔥 FIXED TIMER LOGIC: Prevents NaN Error
+  useEffect(() => {
+    // Only run if popup is open and we have a valid expiry date
+    if (!emailVerificationPopup || !confirmedBookingData?.verification?.expiresAt) {
+      setVerificationTimer('60:00'); // Default fallback
       return;
     }
 
-    // Priority 2: Use existing booking data
-    if (bookingData?.booking) {
-      const booking = bookingData.booking;
+    const expiryString = confirmedBookingData.verification.expiresAt;
+    
+    // Test if date is valid
+    const testDate = new Date(expiryString);
+    if (isNaN(testDate.getTime())) {
+      setVerificationTimer('60:00'); // Safety fallback
+      return;
+    }
 
-      // Parse ISO date strings into separate date and time components with validation
-      if (booking.startDate && booking.endDate) {
-        try {
-          const startDateTime = new Date(booking.startDate);
-          const endDateTime = new Date(booking.endDate);
-
-          // Check if dates are valid before proceeding
-          if (!isNaN(startDateTime.getTime()) && !isNaN(endDateTime.getTime())) {
-            setStartDate(startDateTime.toISOString().split('T')[0]);
-            setStartTime(startDateTime.toISOString().split('T')[1].substring(0, 5)); // HH:MM format
-            setEndDate(endDateTime.toISOString().split('T')[0]);
-            setEndTime(endDateTime.toISOString().split('T')[1].substring(0, 5)); // HH:MM format
-          } else {
-            console.warn('Invalid date values in booking:', booking.startDate, booking.endDate);
-          }
-        } catch (error) {
-          console.error('Error parsing booking dates:', error);
+    const interval = setInterval(() => {
+      try {
+        const expiresAt = new Date(expiryString);
+        const now = new Date();
+        const diff = expiresAt.getTime() - now.getTime();
+        
+        if (diff <= 0) { 
+          setVerificationTimer('EXPIRED'); 
+          clearInterval(interval); 
+          return; 
         }
+
+        const minutes = Math.floor(diff / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+        
+        // Pad with zeros for nice display
+        const minStr = minutes < 10 ? `0${minutes}` : minutes;
+        const secStr = seconds < 10 ? `0${seconds}` : seconds;
+        
+        setVerificationTimer(`${minStr}:${secStr}`);
+      } catch (e) { 
+        console.error("Timer Error", e);
+        setVerificationTimer('ERROR'); 
       }
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [emailVerificationPopup, confirmedBookingData]);
 
-      setRentalType(booking.rentalType);
-      setBookingType(booking.bookingType);
-    }
-  }, [bookingData, startParam, endParam]);
-
-  // Robust URL parameter handling with industrial-grade parsing
-  useEffect(() => {
-    console.log('🔄 URL Params Processing:', {
-      startParam,
-      endParam,
-      currentState: { startDate, endDate, startTime, endTime },
-      hasBookingData: !!bookingData?.booking,
-      urlStartDate,
-      urlEndDate
-    });
-
-    // Only process URL params if we don't have existing booking data (avoid conflicts)
-    if (!bookingData?.booking && (startParam || endParam)) {
-      // Use the industrial parseUrlDateParams function for robust parsing
-      if (urlStartDate) {
-        console.log('✅ Setting start date/time from URL:', urlStartDate);
-        setStartDate(urlStartDate.date);
-        setStartTime(urlStartDate.time);
-      }
-
-      if (urlEndDate) {
-        console.log('✅ Setting end date/time from URL:', urlEndDate);
-        setEndDate(urlEndDate.date);
-        setEndTime(urlEndDate.time);
-      }
-    }
-  }, [urlStartDate, urlEndDate, bookingData]); // Use parsed data as dependencies
-
-  // Check availability when dates change
-  useEffect(() => {
-    if (availabilityData?.checkCarAvailability && !availabilityLoading) {
-      const { available } = availabilityData.checkCarAvailability;
-      setAvailabilityError(!available);
-    }
-  }, [availabilityData, availabilityLoading]);
-
-  // Price Calculation Logic
   const priceDetails = useMemo(() => {
-    if (!carData?.car || !startDateTime || !endDateTime || !platformData?.platformSettings) return null;
-
+    if (!carData?.car || !hasDates || !platformData?.platformSettings) return null;
+    
     const car = carData.car;
     const settings = platformData.platformSettings;
-    const profile = userData?.me?.driverProfile;
-
-    // Safely parse dates with validation
-    const start = isValidDate(startDateTime) ? new Date(startDateTime) : new Date();
-    const end = isValidDate(endDateTime) ? new Date(endDateTime) : new Date();
-
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
-    const diffHours = Math.ceil(diffTime / (1000 * 60 * 60)) || 1;
-
-    // Young Driver / Novice Check
+    const start = new Date(startDateTime);
+    const end = new Date(endDateTime);
+    
+    const diffMs = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24)) || 1; 
+    
     let isYoung = false;
-    let isNovice = false;
-
-    if (profile?.dateOfBirth) {
-      const age = Math.floor((new Date().getTime() - new Date(profile.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+    if (userData?.me?.dateOfBirth) {
+      const age = Math.floor((new Date().getTime() - new Date(userData.me.dateOfBirth).getTime()) / (31557600000));
       if (age < (settings.youngDriverMinAge || 25)) isYoung = true;
     }
 
-    if (profile?.licenseIssueDate) {
-      const licenseYears = Math.floor((new Date().getTime() - new Date(profile.licenseIssueDate).getTime()) / (1000 * 60 * 60 * 24 * 365.25));
-      if (licenseYears < (settings.noviceLicenseYears || 2)) isNovice = true;
-    }
-
-    // Calculate base price based on rental type
-    let basePrice = 0;
-    let durationLabel = '';
-
-    switch (rentalType) {
-      case 'HOUR':
-        basePrice = (car.pricePerHour || 0) * diffHours;
-        durationLabel = `${diffHours} hours`;
-        break;
-      case 'DAY':
-        basePrice = (car.pricePerDay || 0) * diffDays;
-        durationLabel = `${diffDays} days`;
-        break;
-      case 'KM':
-        const estimatedKm = diffDays * 100;
-        basePrice = (car.pricePerKm || 0) * estimatedKm;
-        durationLabel = `${estimatedKm} km`;
-        break;
-      default:
-        basePrice = (car.pricePerDay || 0) * diffDays;
-        durationLabel = `${diffDays} days`;
-    }
-
-    const surchargePerDay = (isYoung || isNovice) ? (settings.youngDriverFee || 30) : 0;
+    const basePrice = (car.pricePerDay || 0) * diffDays;
+    const surchargePerDay = isYoung ? (settings.youngDriverFee || 30) : 0;
     const totalSurcharge = surchargePerDay * diffDays;
-
     const taxAmount = ((basePrice + totalSurcharge) * (settings.taxPercentage || 20)) / 100;
     const totalPrice = basePrice + totalSurcharge + taxAmount;
 
     return {
-      durationLabel,
-      rentalType,
-      basePrice,
-      totalSurcharge,
-      taxAmount,
-      totalPrice,
-      isYoung,
-      isNovice,
-      deposit: car.depositAmount
+      durationLabel: `${diffDays} days`,
+      basePrice, totalSurcharge, taxAmount, totalPrice, isYoung, deposit: car.depositAmount
     };
-  }, [carData, startDateTime, endDateTime, rentalType, platformData, userData]);
+  }, [carData, startDateTime, endDateTime, platformData, userData, hasDates]);
 
-  // Debug logging for GraphQL errors
-  React.useEffect(() => {
-    if (userError) console.error('GET_ME_QUERY Error:', userError);
-    if (platformError) console.error('GET_PLATFORM_SETTINGS_QUERY Error:', platformError);
-  }, [userError, platformError]);
+  // --- 4. HANDLERS ---
 
-  // Auto-create draft booking when coming from car listing (no bookingId)
-  useEffect(() => {
-    if (!carId || bookingId || createBookingLoading || confirmBookingLoading) return;
-
-    // Only create draft if we have all required data and valid dates
-    // Also ensure we have proper date/time values (not just empty strings)
-    if (isValidDate(startDateTime) && isValidDate(endDateTime) &&
-        startDateTime && endDateTime && startDate && startTime && endDate && endTime &&
-        priceDetails && carData?.car) {
-      handleCreateDraftBooking();
-    }
-  }, [carId, bookingId, startDateTime, endDateTime, startDate, startTime, endDate, endTime, priceDetails, carData, createBookingLoading, confirmBookingLoading, isValidDate]);
-
-  const handleCreateDraftBooking = async () => {
-    if (!priceDetails || !carId || !startDateTime || !endDateTime) return;
-
-    // Double-check date validity before sending to backend
-    if (!isValidDate(startDateTime) || !isValidDate(endDateTime)) {
-      console.error('Invalid dates detected, skipping booking creation');
-      return;
-    }
-
+  const handleConfirmAction = async () => {
     try {
+      let bookingIdToUse = bookingId;
+      if (!bookingIdToUse) {
         const { data: bData } = await createBooking({
           variables: {
             input: {
-              carId: carId,
+              carId: carQueryId,
               startDate: new Date(startDateTime).toISOString(),
               endDate: new Date(endDateTime).toISOString(),
-              basePrice: priceDetails.basePrice,
-              taxAmount: priceDetails.taxAmount,
-              surchargeAmount: priceDetails.totalSurcharge,
-              totalPrice: priceDetails.totalPrice,
-              depositAmount: priceDetails.deposit,
-              rentalType: rentalType,
-              bookingType: 'RENTAL',
-              pickupLocation: '',
-              dropoffLocation: ''
+              pickupTime: startTime,
+              returnTime: endTime,
+              basePrice: priceDetails?.basePrice,
+              taxAmount: priceDetails?.taxAmount,
+              totalPrice: priceDetails?.totalPrice,
+              depositAmount: priceDetails?.deposit,
+              bookingType
             }
           }
         });
-
-      if (bData?.createBooking?.id) {
-        // Update URL with bookingId to prevent re-creation
-        const newUrl = `/booking?carId=${carId}&bookingId=${bData.createBooking.id}&start=${encodeURIComponent(startDateTime)}&end=${encodeURIComponent(endDateTime)}`;
-        window.history.replaceState({}, '', newUrl);
+        if (bData?.createBooking?.id) bookingIdToUse = bData.createBooking.id;
       }
-    } catch (error) {
-      console.error('Failed to create draft booking');
+
+      if (bookingIdToUse) {
+        const { data: confirmData } = await confirmReservation({ variables: { id: bookingIdToUse } });
+        if (confirmData?.confirmReservation?.id) {
+          setConfirmedBookingData(confirmData.confirmReservation);
+          setEmailVerificationPopup(true);
+          // Set initial timer immediately to avoid delay
+          setVerificationTimer('59:59'); 
+        }
+      }
+    } catch (error: any) {
+      alert(error.message || 'Booking failed');
     }
   };
 
-  // Handle Final Booking
-  const handleConfirmBooking = async () => {
-    if (!priceDetails) return;
-
-    try {
-      let bookingIdToConfirm = bookingId;
-
-      // If we don't have a booking ID, create a draft booking first
-      if (!bookingIdToConfirm) {
-        // Ensure we have valid dates before creating booking
-        if (!isValidDate(startDateTime) || !isValidDate(endDateTime)) {
-          throw new Error('Please select valid pickup and return dates');
-        }
-
-        const { data: bData } = await createBooking({
-          variables: {
-            input: {
-              carId: carId || bookingData?.booking?.car?.id,
-              startDate: new Date(startDateTime).toISOString(),
-              endDate: new Date(endDateTime).toISOString(),
-              basePrice: priceDetails.basePrice,
-              taxAmount: priceDetails.taxAmount,
-              surchargeAmount: priceDetails.totalSurcharge,
-              totalPrice: priceDetails.totalPrice,
-              depositAmount: priceDetails.deposit,
-              rentalType: rentalType,
-              bookingType: bookingType,
-              pickupLocation: '',
-              dropoffLocation: ''
-            }
-          }
-        });
-
-        if (bData?.createBooking?.id) {
-          bookingIdToConfirm = bData.createBooking.id;
-        } else {
-          throw new Error('Failed to create draft booking');
-        }
-      }
-
-      // Confirm the booking (changes DRAFT to AWAITING_VERIFICATION)
-      const { data: confirmData } = await confirmBooking({
-        variables: { bookingId: bookingIdToConfirm }
-      });
-
-      if (confirmData?.confirmBooking?.success) {
-        // Store booking data for QR/link display
-        const bookingData = confirmData.confirmBooking.booking;
-
-        // If no verification token in response, wait a bit and try again
-        if (!bookingData?.verification?.token) {
-          console.log('🔄 Token not in response, waiting and refetching...');
-          setTimeout(async () => {
-            try {
-              // Refetch the booking data
-              const { data: refetchData } = await refetchBooking();
-              const refetchedBooking = refetchData?.booking;
-
-              if (refetchedBooking?.verification?.token) {
-                setConfirmedBookingData(refetchedBooking);
-              } else {
-                setConfirmedBookingData(bookingData);
-              }
-            } catch (error) {
-              setConfirmedBookingData(bookingData);
-            }
-          }, 1000);
-        } else {
-          setConfirmedBookingData(bookingData);
-        }
-
-        // Start timer at 60:00
-        setVerificationTimer('60:00');
-        // Show QR code and verification link immediately
-        setEmailVerificationPopup(true);
-      } else {
-        console.error('❌ Confirm booking failed:', confirmData);
-        throw new Error('Failed to confirm booking');
-      }
-
-    } catch (err: any) {
-      alert("Booking Error: " + err.message);
+  const handleCopyLink = () => {
+    if (confirmedBookingData?.verification?.token) {
+      const link = `${window.location.origin}/verification/${confirmedBookingData.verification.token}`;
+      navigator.clipboard.writeText(link);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
     }
   };
 
-  if (carLoading || bookingLoading || status === 'loading') {
+  const isLoading = status === 'loading' || bookingLoading || carLoading || !carData?.car;
+
+  if (isLoading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 6 }}>
-        <Box sx={{ minHeight: '80vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-          <CircularProgress size={50} />
-          <Typography mt={2} fontWeight={600} color="text.secondary">Fetching Secure Booking Details...</Typography>
-        </Box>
-      </Container>
+      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#F8FAFC' }}>
+        <CircularProgress size={40} sx={{ color: '#7C3AED' }} />
+      </Box>
     );
   }
 
+  const car = carData.car;
+
   return (
-    <Container maxWidth="lg" sx={{ py: 6 }}>
-      {/* Header: Booking Reference & Back to Search */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Button
-          startIcon={<ArrowBack />}
-          onClick={() => router.push('/cars')}
-          sx={{ textTransform: 'none', color: 'text.secondary' }}
-        >
-          Back to Search
-        </Button>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Typography variant="body2" color="text.secondary">
-            Booking Reference: #{carId?.slice(-6).toUpperCase() || 'TEMP'}
-          </Typography>
-          <Chip
-            label="DRAFT"
-            color="warning"
-            size="small"
-            sx={{ fontWeight: 'bold' }}
-          />
+    <Box sx={{ bgcolor: '#F8FAFC', minHeight: '100vh', pb: 12 }}>
+      <Container maxWidth="xl" sx={{ pt: 4 }}>
+        
+        {/* HEADER */}
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
+          <Stack direction="row" alignItems="center" spacing={1} onClick={() => router.push('/cars')} sx={{ cursor: 'pointer', color: '#64748B', transition:'0.2s', '&:hover':{color:'#7C3AED', transform:'translateX(-4px)'} }}>
+            <ArrowBack fontSize="small" /> <Typography fontWeight={600}>Back to Fleet</Typography>
+          </Stack>
+          <Typography variant="h5" fontWeight={800} color="#0F172A">Secure Checkout</Typography>
+          <Box width={50} />
         </Box>
-      </Box>
 
-      <Typography variant="h4" fontWeight={900} mb={4} sx={{ letterSpacing: -1 }}>
-        Finalize Your Reservation
-      </Typography>
-
-      <Grid container spacing={4}>
-        {/* Left Side: Car Info & Configuration */}
-        <Grid item xs={12} md={7}>
-          <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid #E2E8F0', mb: 3 }}>
-            <Grid container>
-              <Grid item xs={12} sm={5}>
-                <CardMedia
-                  component="img"
-                  image={carData?.car?.images?.find((img: any) => img.isPrimary)?.imagePath || carData?.car?.images?.[0]?.imagePath}
-                  sx={{ height: '100%', minHeight: 200, objectFit: 'cover' }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={7} sx={{ p: 3 }}>
-                <Typography variant="h5" fontWeight={900}>{carData?.car?.brand.name} {carData?.car?.model.name}</Typography>
-                <Typography color="text.secondary" variant="body2" mb={2}>Registration: {carData?.car?.plateNumber}</Typography>
-
-                <Stack direction="row" spacing={1}>
-                  <Chip icon={<Settings sx={{ fontSize: 14 }} />} label={carData?.car?.transmission} size="small" variant="outlined" />
-                  <Chip icon={<LocalGasStation sx={{ fontSize: 14 }} />} label={carData?.car?.fuelType} size="small" variant="outlined" />
-                </Stack>
-              </Grid>
-            </Grid>
-          </Card>
-
-          {/* Car Details Section */}
-          <Paper elevation={0} sx={{ p: 4, borderRadius: 4, border: '1px solid #E2E8F0', mb: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" fontWeight={800}>Car Details</Typography>
-              <Button
-                startIcon={<Edit />}
-                variant="outlined"
-                size="small"
-                onClick={() => setChangeCarDialog(true)}
-                sx={{ textTransform: 'none' }}
-              >
-                Change Car
-              </Button>
-            </Box>
-            <Typography variant="body1" color="text.secondary">
-              {carData?.car?.brand.name} {carData?.car?.model.name} - {carData?.car?.plateNumber}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {carData?.car?.transmission} • {carData?.car?.fuelType} • {carData?.car?.seats} seats
-            </Typography>
-          </Paper>
-
-          {/* Document Verification Notice */}
-          <Alert severity="info" sx={{ borderRadius: 3, mb: 3 }}>
-            <Typography variant="body2">
-              <strong>Document Verification Required:</strong> Your ID and driving license will be verified after booking confirmation.
-            </Typography>
-          </Alert>
-
-          {/* Rental Configuration Section */}
-          <Paper elevation={0} sx={{ p: 4, borderRadius: 4, border: '1px solid #E2E8F0', mb: 3 }}>
-            <Typography variant="h6" fontWeight={800} mb={3} display="flex" alignItems="center">
-              <Schedule sx={{ mr: 1, color: '#2563EB' }} /> Rental Configuration
-            </Typography>
-
-            {/* Date/Time Picker - Same as Car Listing Page */}
-            <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#F8FAFC', mb: 3 }}>
-              <Grid container spacing={3} alignItems="center">
-                <Grid item xs={12} md={6}>
-                  <Stack direction="row" spacing={1} sx={{ bgcolor: 'white', p: 1, borderRadius: 2, border: '1px solid #CBD5E1' }}>
-                    <Box sx={{ flex: 1.5 }}>
-                      <Typography variant="caption" fontWeight={800} color="primary" ml={1}>PICKUP DATE</Typography>
-                      <TextField
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        size="small"
-                        fullWidth
-                        inputProps={{
-                          min: getMinPickupDate() // Industrial minimum pickup date
-                        }}
-                        sx={{
-                          '& .MuiInputBase-root': { border: 'none', '&:before': { border: 'none' }, '&:after': { border: 'none' } },
-                          '& .MuiInputBase-input': { padding: '4px 8px', fontSize: '14px' }
-                        }}
-                      />
-                    </Box>
-                    <Divider orientation="vertical" flexItem />
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="caption" fontWeight={800} color="primary">TIME</Typography>
-                      <TextField
-                        select
-                        value={startTime}
-                        onChange={(e) => setStartTime(e.target.value)}
-                        size="small"
-                        fullWidth
-                        sx={{
-                          '& .MuiInputBase-root': { border: 'none', '&:before': { border: 'none' }, '&:after': { border: 'none' } },
-                          '& .MuiInputBase-input': { padding: '4px 0', fontSize: '14px' }
-                        }}
-                      >
-                        {timeOptions.map((time) => (
-                          <MenuItem key={time} value={time}>
-                            {time}
-                          </MenuItem>
-                        ))}
+        <Grid container spacing={4}>
+          <Grid item xs={12} md={7} lg={8}>
+            <Stack spacing={4}>
+              
+              {/* 1. DATE SELECTOR */}
+              <Paper elevation={0} sx={{ p: 4, borderRadius: 4, bgcolor: 'white', border: '1px solid #E2E8F0', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}>
+                <Box display="flex" justifyContent="space-between" mb={3}>
+                   <Typography variant="h6" fontWeight={800} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                     <CalendarMonth sx={{ color: '#7C3AED' }} /> Trip Dates
+                   </Typography>
+                   {checkingAvailability && <Chip size="small" label="Checking availability..." sx={{ bgcolor: '#F1F5F9' }} />}
+                </Box>
+                <Grid container spacing={4}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" fontWeight={700} color="#64748B" mb={1} display="block">PICK-UP</Typography>
+                    <Stack direction="row" spacing={1}>
+                      <TextField type="date" fullWidth value={startDate} onChange={(e) => setStartDate(e.target.value)} size="small" />
+                      <TextField select value={startTime} onChange={(e) => setStartTime(e.target.value)} size="small" sx={{ minWidth: 100 }}>
+                        {generateTimeOptions().map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
                       </TextField>
-                    </Box>
-                  </Stack>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Stack direction="row" spacing={1} sx={{ bgcolor: !startDate ? '#F1F5F9' : 'white', p: 1, borderRadius: 2, border: '1px solid #CBD5E1', opacity: !startDate ? 0.6 : 1 }}>
-                    <Box sx={{ flex: 1.5 }}>
-                      <Typography variant="caption" fontWeight={800} color="primary" ml={1}>RETURN DATE</Typography>
-                      <TextField
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        disabled={!startDate}
-                        size="small"
-                        fullWidth
-                        inputProps={{
-                          min: startDate // Cannot be before pickup date
-                        }}
-                        sx={{
-                          '& .MuiInputBase-root': { border: 'none', '&:before': { border: 'none' }, '&:after': { border: 'none' } },
-                          '& .MuiInputBase-input': { padding: '4px 8px', fontSize: '14px' }
-                        }}
-                      />
-                    </Box>
-                    <Divider orientation="vertical" flexItem />
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="caption" fontWeight={800} color="primary">TIME</Typography>
-                      <TextField
-                        select
-                        value={endTime}
-                        onChange={(e) => setEndTime(e.target.value)}
-                        disabled={!startDate}
-                        size="small"
-                        fullWidth
-                        sx={{
-                          '& .MuiInputBase-root': { border: 'none', '&:before': { border: 'none' }, '&:after': { border: 'none' } },
-                          '& .MuiInputBase-input': { padding: '4px 0', fontSize: '14px' }
-                        }}
-                      >
-                        {timeOptions.map((time) => (
-                          <MenuItem key={time} value={time}>
-                            {time}
-                          </MenuItem>
-                        ))}
+                    </Stack>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" fontWeight={700} color="#64748B" mb={1} display="block">DROP-OFF</Typography>
+                    <Stack direction="row" spacing={1}>
+                      <TextField type="date" fullWidth value={endDate} onChange={(e) => setEndDate(e.target.value)} size="small" />
+                      <TextField select value={endTime} onChange={(e) => setEndTime(e.target.value)} size="small" sx={{ minWidth: 100 }}>
+                         {generateTimeOptions().map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
                       </TextField>
-                    </Box>
-                  </Stack>
+                    </Stack>
+                  </Grid>
                 </Grid>
-              </Grid>
-            </Paper>
-
-            {/* Rental Type Selection */}
-            <Grid container spacing={3} sx={{ mt: 2 }}>
-              <Grid item xs={12} sm={6}>
-                {availableRentalTypes.length === 1 ? (
-                  // Single rental type - display as static text
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                    <Typography variant="subtitle2" fontWeight={800} color="text.secondary">
-                      Rental Type
-                    </Typography>
-                    <Typography variant="body1" sx={{ py: 1.5, px: 2, border: '1px solid #E2E8F0', borderRadius: 1, bgcolor: '#F8FAFC' }}>
-                      {availableRentalTypes[0].label}
-                    </Typography>
-                  </Box>
-                ) : (
-                  // Multiple rental types - show dropdown
-                  <FormControl fullWidth>
-                    <InputLabel>Rental Type</InputLabel>
-                    <Select
-                      value={rentalType}
-                      label="Rental Type"
-                      onChange={(e) => setRentalType(e.target.value as 'HOUR' | 'DAY' | 'KM')}
-                    >
-                      {availableRentalTypes.map((type) => (
-                        <MenuItem key={type.value} value={type.value}>
-                          {type.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                {!isCarAvailable && hasDates && (
+                  <Alert severity="error" sx={{ mt: 3 }} action={<Button color="error" size="small" onClick={() => setChangeCarDialog(true)}>Change Car</Button>}>
+                    Car Unavailable for selected dates.
+                  </Alert>
                 )}
-              </Grid>
-            </Grid>
+              </Paper>
 
-            {availabilityError && (
-              <Alert severity="error" sx={{ mt: 3, borderRadius: 3, border: '1px solid #fca5a5' }}>
-                <Typography variant="subtitle2" fontWeight={800}>Car Not Available</Typography>
-                <Typography variant="body2">
-                  This car is not available for the selected dates. Please choose different dates or select another car.
-                  {availabilityData?.checkCarAvailability?.conflictingBookings?.length > 0 && (
-                    <Box component="span" sx={{ display: 'block', mt: 1 }}>
-                      {(() => {
-                        try {
-                          const conflictingBooking = availabilityData.checkCarAvailability.conflictingBookings[0];
-                          const startDate = new Date(conflictingBooking.startDate);
-                          const endDate = new Date(conflictingBooking.endDate);
-
-                          // Check if dates are valid
-                          if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-                            return "Conflicting booking found (dates unavailable)";
-                          }
-
-                          return `Conflicting booking: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
-                        } catch (error) {
-                          return "Conflicting booking found";
-                        }
-                      })()}
-                    </Box>
-                  )}
-                </Typography>
-              </Alert>
-            )}
-
-            {priceDetails?.isYoung && (
-              <Alert severity="warning" sx={{ mt: 3, borderRadius: 3, border: '1px solid #fed7aa' }}>
-                <Typography variant="subtitle2" fontWeight={800}>Young Driver Surcharge Applied</Typography>
-                <Typography variant="body2">Based on your profile, a France-mandated novice driver fee is included in the total.</Typography>
-              </Alert>
-            )}
-          </Paper>
-        </Grid>
-
-        {/* Right Side: Pricing */}
-        <Grid item xs={12} md={5}>
-          <Paper elevation={0} sx={{ p: 4, borderRadius: 4, border: '2px solid #0F172A', position: 'sticky', top: 100 }}>
-            <Typography variant="h6" fontWeight={900} mb={3}>Price Breakdown</Typography>
-
-            <Stack spacing={2.5}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography color="text.secondary" fontWeight={500}>
-                  Rental Fee ({priceDetails?.durationLabel} - {priceDetails?.rentalType})
-                </Typography>
-                <Typography fontWeight={700}>€{priceDetails?.basePrice.toFixed(2)}</Typography>
-              </Box>
-
-              {priceDetails?.totalSurcharge && priceDetails.totalSurcharge > 0 && (
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography color="error.main" fontWeight={600}>Young/Novice Driver Fee</Typography>
-                  <Typography fontWeight={700} color="error.main">+ €{priceDetails.totalSurcharge.toFixed(2)}</Typography>
+              {/* 2. VEHICLE INFO */}
+              <Paper elevation={0} sx={{ borderRadius: 4, bgcolor: 'white', border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}>
+                <Box sx={{ p: 3, borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                   <Typography variant="h6" fontWeight={800} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                     <LocationOn sx={{ color: '#7C3AED' }} /> Selected Vehicle
+                   </Typography>
+                   <Button startIcon={<Edit />} size="small" onClick={() => setChangeCarDialog(true)} sx={{ color: '#7C3AED', fontWeight: 700 }}>Change</Button>
                 </Box>
-              )}
-
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography color="text.secondary" fontWeight={500}>VAT ({platformData?.platformSettings?.taxPercentage}%)</Typography>
-                <Typography fontWeight={700}>€{priceDetails?.taxAmount.toFixed(2)}</Typography>
-              </Box>
-
-              <Divider sx={{ my: 1 }} />
-
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="h5" fontWeight={1000}>Total</Typography>
-                <Typography variant="h5" fontWeight={1000} color="primary">€{priceDetails?.totalPrice.toFixed(2)}</Typography>
-              </Box>
-
-              <Box sx={{ mt: 2, p: 2, bgcolor: '#F0F9FF', borderRadius: 2, border: '1px solid #0EA5E9' }}>
-                <Typography variant="body2" color="primary.dark" fontWeight={600}>
-                  💰 Refundable Amount: €{priceDetails?.deposit?.toFixed(2)} - You will pay when you pick up the vehicle
-                </Typography>
-              </Box>
-            </Stack>
-
-            <Button
-              fullWidth
-              variant="contained"
-              size="large"
-              onClick={handleConfirmBooking}
-              disabled={createBookingLoading || confirmBookingLoading || availabilityError}
-              sx={{ mt: 4, py: 2, borderRadius: 3, fontWeight: 900, fontSize: 16, textTransform: 'none' }}
-            >
-              {(createBookingLoading || confirmBookingLoading) ? <CircularProgress size={24} color="inherit" /> : 'Confirm Reservation'}
-            </Button>
-          </Paper>
-        </Grid>
-      </Grid>
-
-      {/* Change Car Dialog */}
-      <Dialog
-        open={changeCarDialog}
-        onClose={() => setChangeCarDialog(false)}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{ sx: { borderRadius: 3 } }}
-      >
-        <DialogTitle sx={{ pb: 1, fontWeight: 900, fontSize: '1.25rem' }}>
-          Change Your Car
-        </DialogTitle>
-        <DialogContent sx={{ pb: 1 }}>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Select an available car for your dates: {isValidDate(startDateTime) && new Date(startDateTime).toLocaleDateString()} - {isValidDate(endDateTime) && new Date(endDateTime).toLocaleDateString()}
-          </Typography>
-          {availableCarsLoading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-              <CircularProgress />
-            </Box>
-          ) : availableCarsData?.availableCars?.length > 0 ? (
-            <Grid container spacing={2}>
-              {availableCarsData.availableCars.slice(0, 6).map((car: any) => (
-                <Grid item xs={12} sm={6} key={car.id}>
-                  <Card
-                    sx={{
-                      cursor: 'pointer',
-                      border: '1px solid #E2E8F0',
-                      '&:hover': { borderColor: '#2563EB', boxShadow: 2 }
-                    }}
-                    onClick={() => {
-                      const newUrl = `/booking?carId=${car.id}&start=${startDateTime}&end=${endDateTime}`;
-                      router.push(newUrl);
-                      setChangeCarDialog(false);
-                    }}
-                  >
-                    <CardMedia
-                      component="img"
-                      height="140"
-                      image={car.images?.find((img: any) => img.isPrimary)?.imagePath || car.images?.[0]?.imagePath}
-                      alt={`${car.brand.name} ${car.model.name}`}
-                    />
-                    <CardContent sx={{ pb: 2 }}>
-                      <Typography variant="h6" fontWeight={800}>
-                        {car.brand.name} {car.model.name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" mb={1}>
-                        {car.plateNumber}
-                      </Typography>
-                      <Typography variant="h6" color="primary" fontWeight={900}>
-                        €{car.pricePerDay}/day
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          ) : (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <Typography variant="h6" color="text.secondary">
-                No other cars available for these dates
-              </Typography>
-              <Button
-                variant="outlined"
-                onClick={() => router.push('/cars')}
-                sx={{ mt: 2 }}
-              >
-                Browse All Cars
-              </Button>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 3, pt: 0 }}>
-          <Button onClick={() => setChangeCarDialog(false)}>Cancel</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Verification QR Code & Link Popup */}
-      <Dialog open={emailVerificationPopup} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogContent sx={{ textAlign: 'center', p: 4 }}>
-          <Box sx={{ width: 80, height: 80, bgcolor: '#DBEAFE', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 3 }}>
-            <CheckCircle color="primary" sx={{ fontSize: 50 }} />
-          </Box>
-          <Typography variant="h5" fontWeight={1000} gutterBottom sx={{ mb: 2, color: '#1E40AF' }}>
-            Booking Confirmed! Complete Verification Now
-          </Typography>
-          <Typography color="text.secondary" sx={{ mb: 4 }}>
-            Your booking has been confirmed but needs verification. Scan the QR code below or use the magic link to complete your booking.
-            <br /><strong>This link expires in 1 hour - other users can book this car if you don't verify quickly!</strong>
-          </Typography>
-
-          {/* Timer Display */}
-          <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <Typography variant="h6" fontWeight={800} color="primary" gutterBottom>
-              ⏰ Verification Time Remaining
-            </Typography>
-            <Box sx={{
-              display: 'inline-block',
-              px: 3,
-              py: 2,
-              bgcolor: verificationTimer === 'EXPIRED' ? '#FEE2E2' : '#F0F9FF',
-              border: `2px solid ${verificationTimer === 'EXPIRED' ? '#EF4444' : '#0EA5E9'}`,
-              borderRadius: 3,
-              minWidth: 120
-            }}>
-              <Typography
-                variant="h4"
-                fontWeight={900}
-                color={verificationTimer === 'EXPIRED' ? 'error.main' : 'primary.main'}
-                fontFamily="monospace"
-              >
-                {verificationTimer}
-              </Typography>
-            </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              {verificationTimer === 'EXPIRED'
-                ? 'Link has expired - booking cancelled'
-                : 'Complete verification before timer expires'
-              }
-            </Typography>
-          </Box>
-
-          {/* QR Code and Link Section */}
-          <Box sx={{ mb: 4 }}>
-            <Grid container spacing={4} alignItems="center" justifyContent="center">
-              <Grid item xs={12} md={6}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <Typography variant="h6" fontWeight={700} color="#1E40AF" mb={2}>
-                    Scan QR Code
-                  </Typography>
-                  <Box sx={{
-                    p: 3,
-                    bgcolor: 'white',
-                    borderRadius: 4,
-                    border: '3px solid #E2E8F0',
-                    display: 'inline-block',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                  }}>
-                    {confirmedBookingData?.verification?.token ? (
-                      <QRCode
-                        value={`${window.location.origin}/verification/${confirmedBookingData.verification.token}`}
-                        size={200}
-                        style={{ height: 'auto', maxWidth: '100%', width: '100%' }}
+                <Grid container alignItems="center">
+                   <Grid item xs={12} md={5} sx={{ bgcolor: '#F8FAFC', p: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 220 }}>
+                      <Box 
+                        component="img" 
+                        src={car.images?.[0]?.url} 
+                        sx={{ width: '100%', maxHeight: 180, objectFit: 'contain', filter: 'drop-shadow(0 15px 25px rgba(0,0,0,0.15))' }} 
+                        alt={car.model.name}
                       />
-                    ) : (
-                      <Box sx={{
-                        width: 200,
-                        height: 200,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        bgcolor: '#f5f5f5',
-                        borderRadius: 2,
-                        border: '2px dashed #ccc'
-                      }}>
-                        <Typography color="text.secondary">Loading QR Code...</Typography>
+                   </Grid>
+                   <Grid item xs={12} md={7} sx={{ p: 4 }}>
+                      <Typography variant="overline" color="primary" fontWeight={800}>{car.brand.name}</Typography>
+                      <Typography variant="h4" fontWeight={900} color="#0F172A" sx={{ lineHeight: 1, mb: 2 }}>{car.model.name}</Typography>
+                      
+                      <Stack direction="row" spacing={1} mb={3} flexWrap="wrap" gap={1}>
+                         <Chip label={car.transmission} size="small" icon={<Settings sx={{fontSize:14}}/>} sx={{fontWeight:600}} />
+                         <Chip label={car.fuelType} size="small" icon={<LocalGasStation sx={{fontSize:14}}/>} sx={{fontWeight:600}} />
+                         <Chip label={`${car.seats} Seats`} size="small" icon={<EventSeat sx={{fontSize:14}}/>} sx={{fontWeight:600}} />
+                      </Stack>
+                      
+                      <Divider sx={{ my: 2, borderStyle: 'dashed' }} />
+                      
+                      <Box display="flex" gap={4}>
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">Daily Limit</Typography>
+                          <Typography fontWeight={700}>{car.dailyKmLimit || 'Unlimited'} KM</Typography>
+                        </Box>
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">Deposit</Typography>
+                          <Typography fontWeight={700}>€{car.depositAmount}</Typography>
+                        </Box>
                       </Box>
-                    )}
-                  </Box>
-                </Box>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <Typography variant="h6" fontWeight={700} color="#1E40AF" mb={2}>
-                    Or Use Magic Link
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    value={confirmedBookingData?.verification?.token
-                      ? `${window.location.origin}/verification/${confirmedBookingData.verification.token}`
-                      : 'Generating verification link...'
-                    }
-                    InputProps={{
-                      readOnly: true,
-                      endAdornment: confirmedBookingData?.verification?.token ? (
-                        <IconButton
-                          size="small"
-                          onClick={() => navigator.clipboard.writeText(`${window.location.origin}/verification/${confirmedBookingData.verification.token}`)}
-                          sx={{ color: 'primary.main' }}
-                        >
-                          <Edit/>
-                        </IconButton>
-                      ) : null
-                    }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        bgcolor: 'white',
-                        borderRadius: 2,
-                        mb: 2
-                      }
-                    }}
-                  />
-                  <Button
-                    variant="contained"
-                    fullWidth
-                    size="large"
-                    disabled={!confirmedBookingData?.verification?.token}
-                    onClick={() => {
-                      window.open(`${window.location.origin}/verification/${confirmedBookingData.verification.token}`, '_blank', 'noopener,noreferrer');
-                    }}
-                    sx={{
-                      borderRadius: 3,
-                      fontWeight: 700,
-                      fontSize: '1.1rem',
-                      py: 1.5,
-                      bgcolor: '#1E40AF',
-                      '&:hover': {
-                        bgcolor: '#1D4ED8'
-                      },
-                      '&:disabled': {
-                        bgcolor: '#9CA3AF'
-                      }
-                    }}
-                  >
-                    {confirmedBookingData?.verification?.token ? 'Open Verification Page' : 'Generating Link...'}
-                  </Button>
-                </Box>
-              </Grid>
-            </Grid>
-          </Box>
+                   </Grid>
+                </Grid>
+              </Paper>
+            </Stack>
+          </Grid>
 
-          <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
-            <Typography variant="body2">
-              <strong>⚡ Time Sensitive:</strong> Complete verification within 1 hour or this booking may be lost to another customer!
-            </Typography>
-          </Alert>
+          {/* RIGHT COLUMN */}
+          <Grid item xs={12} md={5} lg={4}>
+            <Paper elevation={0} sx={{ p: 4, borderRadius: 4, bgcolor: 'white', border: '1px solid #E2E8F0', position: 'sticky', top: 100 }}>
+               <Typography variant="h6" fontWeight={800} mb={3}>Payment Summary</Typography>
+               {priceDetails ? (
+                 <Stack spacing={2.5}>
+                    <Box display="flex" justifyContent="space-between">
+                       <Typography color="text.secondary">Rental ({priceDetails.durationLabel})</Typography>
+                       <Typography fontWeight={700}>€{priceDetails.basePrice.toFixed(2)}</Typography>
+                    </Box>
+                    <Box display="flex" justifyContent="space-between">
+                       <Typography color="text.secondary">VAT ({platformData?.platformSettings?.taxPercentage || 20}%)</Typography>
+                       <Typography fontWeight={700}>€{priceDetails.taxAmount.toFixed(2)}</Typography>
+                    </Box>
+                    <Divider sx={{ borderStyle: 'dashed' }} />
+                    <Box display="flex" justifyContent="space-between" alignItems="flex-end">
+                       <Typography variant="h6" fontWeight={800}>Total</Typography>
+                       <Typography variant="h4" fontWeight={800} color="#7C3AED">€{priceDetails.totalPrice.toFixed(2)}</Typography>
+                    </Box>
+                    <Box sx={{ p: 2, bgcolor: '#F0FDF4', borderRadius: 2, border: '1px solid #BBF7D0', display: 'flex', gap: 1 }}>
+                       <Shield sx={{ color: '#16A34A', fontSize: 20 }} />
+                       <Typography variant="caption" color="#15803D" fontWeight={500} lineHeight={1.4}>
+                         No charge now. Payment collected after verification.
+                       </Typography>
+                    </Box>
+                    <Button 
+                      fullWidth variant="contained" size="large" 
+                      onClick={handleConfirmAction}
+                      disabled={!isCarAvailable || createBookingLoading || confirmReservationLoading}
+                      sx={{ mt: 1, bgcolor: '#0F172A', py: 1.5, fontWeight: 800, '&:hover': { bgcolor: '#334155' } }}
+                    >
+                      Confirm Reservation
+                    </Button>
+                 </Stack>
+               ) : (
+                 <Box textAlign="center" py={4} color="text.secondary">Select dates to view price breakdown.</Box>
+               )}
+            </Paper>
+          </Grid>
+        </Grid>
+      </Container>
 
-          <Button
-            fullWidth
-            variant="outlined"
-            onClick={() => {
-              setEmailVerificationPopup(false);
-              setConfirmedBookingData(null); // Clear the data
-              setVerificationTimer('60:00'); // Reset timer
-              // Force refresh booking records when navigating
-              router.push('/bookingRecords?refresh=' + Date.now());
+      {/* --- MODALS --- */}
 
-              // Also invalidate the bookings cache
-              client.cache.evict({ fieldName: 'myBookings' });
-              client.cache.gc();
-            }}
-            sx={{ borderRadius: 3, py: 1.5, fontWeight: 700, borderColor: '#1E40AF', color: '#1E40AF' }}
-          >
-            Go to Booking Records
-          </Button>
+      <Dialog 
+        open={changeCarDialog} 
+        onClose={() => setChangeCarDialog(false)} 
+        maxWidth="lg" 
+        fullWidth 
+        PaperProps={{ sx: { borderRadius: 4, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' } }}
+      >
+        <Box sx={{ p: 3, px: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F1F5F9' }}>
+           <Typography variant="h6" fontWeight={800} color="#0F172A">Available Cars for These Dates</Typography>
+           <IconButton onClick={() => setChangeCarDialog(false)}><Close /></IconButton>
+        </Box>
+        <DialogContent sx={{ bgcolor: '#FFFFFF', p: 4 }}>
+           {availableCarsLoading ? (
+             <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress size={40} sx={{ color: '#7C3AED' }} /></Box>
+           ) : availableCarsData?.availableCars?.length > 0 ? (
+             <Grid container spacing={3}>
+                {availableCarsData.availableCars.map((c: any) => (
+                  <Grid item xs={12} sm={6} md={4} key={c.id}>
+                     <Card 
+                       elevation={0}
+                       sx={{ borderRadius: 4, border: '1px solid #E2E8F0', overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s', '&:hover': { borderColor: '#7C3AED', transform: 'translateY(-4px)', boxShadow: '0 12px 24px -10px rgba(124, 58, 237, 0.15)' } }}
+                       onClick={() => {
+                          const newUrl = `/booking?carId=${c.id}&start=${startDateTime}&end=${endDateTime}`;
+                          router.push(newUrl);
+                          setChangeCarDialog(false);
+                       }}
+                     >
+                        <CardActionArea sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
+                          <Box sx={{ height: 180, bgcolor: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 3 }}>
+                             <Box component="img" src={c.images?.[0]?.url} sx={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.1))' }} />
+                          </Box>
+                          <Box sx={{ p: 3, flexGrow: 1 }}>
+                             <Typography variant="overline" color="text.secondary" fontWeight={700} sx={{ letterSpacing: 0.5 }}>{c.brand.name}</Typography>
+                             <Typography variant="h5" fontWeight={900} color="#0F172A" sx={{ mb: 2 }}>{c.model.name}</Typography>
+                             <Stack direction="row" spacing={1} mb={3}>
+                                <Chip label={c.transmission} size="small" sx={{ borderRadius: 1, fontWeight: 600, bgcolor: '#F1F5F9', color: '#475569' }} />
+                                <Chip label={c.fuelType} size="small" sx={{ borderRadius: 1, fontWeight: 600, bgcolor: '#F1F5F9', color: '#475569' }} />
+                             </Stack>
+                             <Divider sx={{ borderStyle: 'dashed', mb: 2 }} />
+                             <Box display="flex" justifyContent="space-between" alignItems="center">
+                                <Typography variant="h6" fontWeight={800} color="#0F172A">€{c.pricePerDay}<Typography component="span" variant="body2" color="text.secondary" fontWeight={500}>/day</Typography></Typography>
+                                <Typography variant="button" fontWeight={800} color="#0F172A">Select</Typography>
+                             </Box>
+                          </Box>
+                        </CardActionArea>
+                     </Card>
+                  </Grid>
+                ))}
+             </Grid>
+           ) : (
+             <Box textAlign="center" py={8}>
+               <Typography variant="h6" fontWeight={700} color="#0F172A">No other cars available</Typography>
+               <Typography color="text.secondary">Try changing your dates to see more options.</Typography>
+             </Box>
+           )}
         </DialogContent>
       </Dialog>
 
-      {/* Success Dialog (legacy) */}
-      <Dialog open={verificationDialog} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 6, p: 2 } }}>
-        <DialogContent sx={{ textAlign: 'center' }}>
-          <Box sx={{ width: 80, height: 80, bgcolor: '#DCFCE7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 3 }}>
-            <CheckCircle color="success" sx={{ fontSize: 50 }} />
-          </Box>
-          <Typography variant="h5" fontWeight={1000} gutterBottom>Booking Reserved!</Typography>
-          <Typography color="text.secondary" mb={4}>
-            A magic verification link has been sent to your email.
-          </Typography>
-          <Button fullWidth variant="contained" onClick={() => router.push('/bookings')} sx={{ borderRadius: 3, py: 1.5, fontWeight: 900 }}>
-            Go to My Bookings
-          </Button>
-        </DialogContent>
+      {/* 2. VERIFICATION MODAL (NO CLOSE BUTTON) */}
+      <Dialog 
+        open={emailVerificationPopup} 
+        maxWidth="md" 
+        fullWidth 
+        PaperProps={{ sx: { borderRadius: 4, overflow: 'hidden' } }}
+        // Prevent closing by clicking outside
+        onClose={() => {}} 
+      >
+        {/* Removed Close Icon Box Here */}
+        <Grid container>
+          <Grid item xs={12} md={5} sx={{ bgcolor: '#7C3AED', p: 5, display: 'flex', flexDirection: 'column', justifyContent: 'center', color: 'white' }}>
+             <Box sx={{ width: 60, height: 60, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3 }}>
+               <CheckCircle sx={{ fontSize: 32 }} />
+             </Box>
+             <Typography variant="h4" fontWeight={900} gutterBottom>Booking Saved!</Typography>
+             <Typography sx={{ opacity: 0.9, lineHeight: 1.6, mb: 4 }}>
+               Complete verification within the time limit to secure your car.
+             </Typography>
+             
+             <Box sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 3, border: '1px solid rgba(255,255,255,0.2)' }}>
+                <Typography variant="caption" fontWeight={700} sx={{ opacity: 0.8, letterSpacing: 1, display:'flex', alignItems:'center', gap:1 }}>
+                   <AccessAlarm fontSize="small"/> TIME REMAINING
+                </Typography>
+                <Typography variant="h3" fontWeight={800} sx={{ fontFamily: 'monospace', mt:1 }}>
+                   {verificationTimer}
+                </Typography>
+             </Box>
+          </Grid>
+
+          <Grid item xs={12} md={7} sx={{ p: 5, textAlign: 'center' }}>
+             {confirmedBookingData?.verification?.token ? (
+               <Box sx={{ p: 2, border: '2px solid #F1F5F9', borderRadius: 3, display: 'inline-block', mb: 3 }}>
+                 <QRCode value={`${window.location.origin}/verification/${confirmedBookingData.verification.token}`} size={160} />
+               </Box>
+             ) : <CircularProgress />}
+             
+             <Typography variant="body1" fontWeight={600} color="#0F172A" mb={3}>Scan QR to verify Identity</Typography>
+             
+             <Button 
+                fullWidth 
+                variant="contained" 
+                size="large"
+                startIcon={<ContentCopy />} 
+                onClick={handleCopyLink}
+                sx={{ py: 1.5, borderRadius: 3, bgcolor: '#0F172A', fontWeight: 700 }}
+             >
+                {copySuccess ? 'Link Copied!' : 'Copy Verification Link'}
+             </Button>
+
+             <Button 
+                fullWidth 
+                variant="outlined" 
+                onClick={() => router.push('/bookingRecords')}
+                sx={{ mt: 2, py: 1.5, borderRadius: 3, borderColor: '#E2E8F0', color: '#64748B', fontWeight: 600 }}
+             >
+                Go to Booking Records
+             </Button>
+             
+             <Alert severity="warning" icon={<WarningAmber fontSize="small"/>} sx={{ mt: 4, borderRadius: 2, textAlign: 'left', fontSize: '0.85rem' }}>
+                Booking will be cancelled if verification is not started within 1 hour.
+             </Alert>
+          </Grid>
+        </Grid>
       </Dialog>
 
-    </Container>
+      <Snackbar open={copySuccess} autoHideDuration={2000} onClose={() => setCopySuccess(false)} message="Link copied to clipboard" />
+
+    </Box>
+  );
+}
+
+export default function BookingPageWrapper() {
+  return (
+    <Suspense fallback={<Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CircularProgress /></Box>}>
+      <BookingContent />
+    </Suspense>
   );
 }

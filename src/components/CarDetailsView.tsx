@@ -66,7 +66,7 @@ export default function CarDetailsView({ car, onClose, onBook }: CarDetailsProps
             }}
           >
             <img
-              src={car.images?.find((img: any) => img.isPrimary)?.imagePath || car.images?.[0]?.imagePath}
+              src={car.images?.find((img: any) => img.isPrimary)?.url || car.images?.[0]?.url}
               alt={car.model.name}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
@@ -136,7 +136,7 @@ export default function CarDetailsView({ car, onClose, onBook }: CarDetailsProps
 
           {/* Security Deposit Info */}
           <Alert icon={<InfoIcon fontSize="inherit" />} severity="info" sx={{ mb: 4, borderRadius: 3 }}>
-            Refundable Deposit: <strong>€{car.depositAmount}</strong>
+            Refundable Deposit: <strong>€{car.depositAmount?.toFixed(2)}</strong>
           </Alert>
 
           <Button

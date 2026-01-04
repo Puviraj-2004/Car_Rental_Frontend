@@ -178,7 +178,7 @@ export default function PaymentPage({ params }: PaymentPageProps) {
             <Grid item xs={12} sm={6}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                 <Typography>Base Price:</Typography>
-                <Typography>€{booking.basePrice.toFixed(2)}</Typography>
+                <Typography>€{booking.basePrice}</Typography>
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                 <Typography>Tax (20%):</Typography>

@@ -1,95 +1,158 @@
 'use client';
 
 import React from 'react';
-import { Box, Container, Grid, Typography, Card, CardContent, Button, Skeleton } from '@mui/material';
+import { Box, Container, Grid, Typography, Card, Button, Stack, IconButton, Skeleton } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@apollo/client';
 import { GET_CARS_QUERY } from '@/lib/graphql/queries';
+import SafeImage from '@/components/SafeImage';
 
-export default function FeaturedCars() {
+// Icons
+import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
+import SettingsIcon from '@mui/icons-material/Settings';
+import PeopleIcon from '@mui/icons-material/People';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+
+export default function FeaturedFleet() {
   const router = useRouter();
-
-  // 🚀 Backend-ல் இருந்து கார்களை எடுக்கிறோம்
+  
   const { data, loading, error } = useQuery(GET_CARS_QUERY, {
-    variables: { filter: { status: 'AVAILABLE' } } // கிடைக்கும் கார்களை மட்டும் எடுக்க
+    variables: { filter: { statuses: ['AVAILABLE'] } } 
   });
 
-  if (error) return null; // எரர் வந்தால் இந்த செக்ஷன் தெரியாது
-
-  // நாம் எல்லா கார்களையும் காட்டப் போவதில்லை, முதல் 3 கார்களை மட்டும் காட்டப்போகிறோம்
+  if (error) return null; 
   const featuredCars = data?.cars?.slice(0, 3) || [];
 
   return (
-    <Box sx={{ py: 12, bgcolor: '#0F172A', color: 'white' }}>
+    <Box sx={{ py: 10, bgcolor: '#FFFFFF' }}>
       <Container maxWidth="xl">
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mb: 6 }}>
-          <Box>
-            <Typography variant="overline" sx={{ color: '#60A5FA', fontWeight: 'bold', letterSpacing: 2 }}>
-              EXPLORE
-            </Typography>
-            <Typography variant="h3" fontWeight="bold">Our Premium Fleet</Typography>
-          </Box>
-          <Button 
-            variant="outlined" 
-            color="inherit" 
-            onClick={() => router.push('/cars')}
-            sx={{ borderRadius: '20px', px: 4 }}
-          >
-            View All Fleet
-          </Button>
+        
+        {/* HEADER */}
+        <Box sx={{ textAlign: 'center', mb: 8 }}>
+          <Typography variant="overline" sx={{ color: '#94A3B8', fontWeight: 800, letterSpacing: 1.5 }}>
+            POPULAR DEALS
+          </Typography>
+          <Typography variant="h3" sx={{ color: '#0F172A', fontWeight: 800, mt: 1 }}>
+            Most Popular Cars
+          </Typography>
         </Box>
 
         <Grid container spacing={4}>
           {loading ? (
-            // லோடிங் ஆகும்போது காட்டும் போலி கட்டங்கள் (Skeletons)
             [1, 2, 3].map((i) => (
-              <Grid item xs={12} sm={6} md={4} key={i}>
-                <Skeleton variant="rectangular" height={300} sx={{ bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 4 }} />
+              <Grid item xs={12} md={4} key={i}>
+                <Skeleton variant="rectangular" height={380} sx={{ borderRadius: 4 }} />
               </Grid>
             ))
           ) : (
             featuredCars.map((car: any) => (
-              <Grid item xs={12} sm={6} md={4} key={car.id}>
-                <Card sx={{
-                  bgcolor: 'rgba(255,255,255,0.03)',
-                  color: 'white',
-                  borderRadius: 4,
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  transition: '0.3s',
-                  '&:hover': { transform: 'translateY(-10px)', bgcolor: 'rgba(255,255,255,0.07)' }
-                }}>
-                  <Box sx={{
-                    height: '120px',
-                    bgcolor: 'rgba(255,255,255,0.1)',
+              <Grid item xs={12} md={4} key={car.id}>
+                <Card 
+                  elevation={0}
+                  sx={{
+                    bgcolor: '#F8F9FB', 
+                    borderRadius: 5,
+                    p: 3,
+                    height: '100%',
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderRadius: '4px 4px 0 0'
-                  }}>
-                    <Typography variant="h6" sx={{ color: '#60A5FA', fontWeight: 'bold' }}>
-                      🚗
-                    </Typography>
+                    flexDirection: 'column',
+                    transition: 'all 0.3s ease',
+                    border: '1px solid transparent',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      bgcolor: '#F1F5F9',
+                      transform: 'translateY(-5px)',
+                      borderColor: 'rgba(124, 58, 237, 0.2)',
+                      '& .car-image': { transform: 'scale(1.05)' } // Slight zoom on hover
+                    }
+                  }}
+                  onClick={() => router.push(`/cars/viewDetails/${car.id}`)}
+                >
+                  {/* 1. TOP INFO */}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                    <Box>
+                      <Typography variant="h6" fontWeight={800} color="#0F172A" sx={{ lineHeight: 1.2 }}>
+                        {car.brand.name}
+                      </Typography>
+                      <Typography variant="caption" color="#64748B" fontWeight={500}>
+                        {car.model.name}
+                      </Typography>
+                    </Box>
+                    <IconButton size="small" sx={{ color: '#94A3B8' }}>
+                      <FavoriteBorderIcon fontSize="small" />
+                    </IconButton>
                   </Box>
-                  <CardContent sx={{ p: 3, textAlign: 'center' }}>
-                    <Typography variant="caption" sx={{ color: '#60A5FA', fontWeight: 'bold', letterSpacing: 1 }}>
-                      {car.brand.name.toUpperCase()}
-                    </Typography>
-                    <Typography variant="h5" fontWeight="bold" sx={{ mt: 1, mb: 3 }}>
-                      {car.model.name}
-                    </Typography>
-                    
-                    {/* உங்கள் விருப்பப்படி விலை (Price) இங்கே இல்லை */}
-                    
+
+                  {/* 2. CAR IMAGE - Increased Height & Full Width */}
+                  <Box 
+                    className="car-image"
+                    sx={{ 
+                      height: 220, // Increased from 160 to 220 to fill space
+                      width: '100%',
+                      position: 'relative', 
+                      my: 1, // Reduced margin
+                      transition: 'transform 0.3s ease',
+                      filter: 'drop-shadow(0 15px 15px rgba(0,0,0,0.1))'
+                    }}
+                  >
+                    <SafeImage
+                      src={(car.images.find((img: { isPrimary: boolean }) => img.isPrimary) || car.images[0])?.url}
+                      alt={`${car.brand.name} ${car.model.name}`}
+                      fill
+                      style={{ 
+                        objectFit: 'contain', // Keeps whole car visible
+                        objectPosition: 'center' // Centers it perfectly
+                      }}
+                    />
+                  </Box>
+
+                  {/* 3. SPECS */}
+                  <Stack 
+                    direction="row" 
+                    justifyContent="space-between" 
+                    alignItems="center" 
+                    sx={{ mb: 3, mt: 'auto', px: 1 }}
+                  >
+                    <Stack direction="row" spacing={0.5} alignItems="center" color="#64748B">
+                      <LocalGasStationIcon sx={{ fontSize: 18 }} />
+                      <Typography variant="caption" fontWeight={600}>{car.fuelType}</Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={0.5} alignItems="center" color="#64748B">
+                      <SettingsIcon sx={{ fontSize: 18 }} />
+                      <Typography variant="caption" fontWeight={600}>{car.transmission}</Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={0.5} alignItems="center" color="#64748B">
+                      <PeopleIcon sx={{ fontSize: 18 }} />
+                      <Typography variant="caption" fontWeight={600}>{car.seats} People</Typography>
+                    </Stack>
+                  </Stack>
+
+                  {/* 4. FOOTER */}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box>
+                      <Typography variant="h6" fontWeight={800} color="#0F172A">
+                        €{car.pricePerDay?.toFixed(0)}
+                        <Typography component="span" variant="caption" color="#64748B" sx={{ ml: 0.5 }}>
+                          /day
+                        </Typography>
+                      </Typography>
+                    </Box>
                     <Button 
-                      fullWidth 
                       variant="contained" 
-                      color="secondary"
-                      onClick={() => router.push(`/cars/${car.id}`)}
-                      sx={{ borderRadius: 2, fontWeight: 'bold', py: 1.2 }}
+                      sx={{ 
+                        bgcolor: '#7C3AED', 
+                        color: 'white',
+                        borderRadius: '50px',
+                        textTransform: 'none',
+                        fontWeight: 700,
+                        px: 3,
+                        boxShadow: '0 4px 14px 0 rgba(124, 58, 237, 0.4)',
+                        '&:hover': { bgcolor: '#6D28D9' }
+                      }}
                     >
-                      View Details
+                      Rent Now
                     </Button>
-                  </CardContent>
+                  </Box>
                 </Card>
               </Grid>
             ))

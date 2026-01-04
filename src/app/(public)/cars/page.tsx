@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
-  Box, Container, Grid, Typography, Card, CardContent, Button, Chip, Stack,
-  Divider, Paper, Skeleton, Checkbox, FormControlLabel, FormGroup, Drawer,
-  IconButton, Snackbar, Alert, Dialog, DialogContent, Slide, TextField, MenuItem
+  Box, Container, Grid, Typography, Card, Button, Chip, Stack,
+  Divider, Checkbox, FormControlLabel, FormGroup, Drawer,
+  IconButton, Snackbar, Alert, Dialog, DialogContent, Slide, TextField,
+  InputAdornment, Paper, useTheme, useMediaQuery, MenuItem, Select, FormControl, InputLabel
 } from '@mui/material';
 import { TransitionProps } from '@mui/material/transitions';
 import { useQuery, useMutation } from '@apollo/client';
@@ -12,22 +13,19 @@ import { GET_CARS_QUERY, GET_CAR_ENUMS, GET_BRANDS_QUERY } from '@/lib/graphql/q
 import { CREATE_BOOKING_MUTATION } from '@/lib/graphql/mutations';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { addHours, addDays, isBefore, isAfter, format, parseISO, startOfHour, startOfDay } from 'date-fns';
-import dayjs from 'dayjs';
+import { addDays, isBefore, format, startOfDay } from 'date-fns';
 
 // Icons
 import TuneIcon from '@mui/icons-material/Tune';
 import CloseIcon from '@mui/icons-material/Close';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import SettingsIcon from '@mui/icons-material/Settings';
 import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
 import EventSeatIcon from '@mui/icons-material/EventSeat';
-import SpeedIcon from '@mui/icons-material/Speed';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 
-// Dialog Transition
 const Transition = React.forwardRef(function Transition(
   props: TransitionProps & { children: React.ReactElement<any, any> },
   ref: React.Ref<unknown>,
@@ -35,10 +33,29 @@ const Transition = React.forwardRef(function Transition(
   return <Slide direction="up" ref={ref} {...props} />;
 });
 
+// 🕒 Helper: Generate 30-min interval time slots
+const generateTimeSlots = () => {
+  const slots = [];
+  for (let i = 0; i < 24; i++) {
+    const hour = i.toString().padStart(2, '0');
+    slots.push(`${hour}:00`);
+    slots.push(`${hour}:30`);
+  }
+  return slots;
+};
+
+const TIME_SLOTS = generateTimeSlots();
+
 export default function CarsListingPage() {
   const router = useRouter();
+  const theme = useTheme();
   const { data: session, status } = useSession();
   const [createBooking] = useMutation(CREATE_BOOKING_MUTATION);
+  
+  // Ref for scrolling to top
+  const topBarRef = useRef<HTMLDivElement>(null);
+
+  // UI States
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
@@ -46,20 +63,14 @@ export default function CarsListingPage() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedCar, setSelectedCar] = useState<any>(null);
 
-  // Initialize with proper defaults using date-fns
-  const now = new Date();
-  const defaultPickupTime = addHours(startOfHour(addHours(now, 1)), Math.ceil(now.getMinutes() / 30) * 0.5);
-  const defaultReturnTime = addHours(defaultPickupTime, 2);
-
-  // 1. Main Filter State with proper defaults
+  // 1. FILTER STATE (Empty by default)
   const [mainFilter, setMainFilter] = useState({
-    startDate: format(now, 'yyyy-MM-dd'),
-    startTime: format(defaultPickupTime, 'HH:mm'),
-    endDate: format(now, 'yyyy-MM-dd'),
-    endTime: format(defaultReturnTime, 'HH:mm')
+    startDate: '',
+    startTime: '', 
+    endDate: '',
+    endTime: ''    
   });
 
-  // 2. Secondary Filter State
   const [secondaryFilter, setSecondaryFilter] = useState({
     fuelTypes: [] as string[],
     transmissions: [] as string[],
@@ -67,172 +78,68 @@ export default function CarsListingPage() {
     critAir: [] as string[],
   });
 
-  // 📡 Queries
-  // Note: Backend handles conditional status filtering based on date selection
-  // - No dates: Shows all cars except OUT_OF_SERVICE
-  // - With dates: Shows only AVAILABLE cars with no conflicts & 24h buffer
   const { data: enumData } = useQuery(GET_CAR_ENUMS);
   const { data: brandData } = useQuery(GET_BRANDS_QUERY);
 
-  // Create reactive filter object that updates when dates change
-  const carFilter = useMemo(() => {
-    const filter: any = {
-      fuelType: secondaryFilter.fuelTypes.length > 0 ? secondaryFilter.fuelTypes[0] : undefined,
-      transmission: secondaryFilter.transmissions.length > 0 ? secondaryFilter.transmissions[0] : undefined,
-      brandId: secondaryFilter.brands.length > 0 ? secondaryFilter.brands[0] : undefined,
+  // 🧠 2. VALIDATION & FILTER LOGIC
+  const { filterPayload, isDateSelected, isValidSelection } = useMemo(() => {
+    let payload: any = {
+      fuelTypes: secondaryFilter.fuelTypes.length > 0 ? secondaryFilter.fuelTypes : undefined,
+      transmissions: secondaryFilter.transmissions.length > 0 ? secondaryFilter.transmissions : undefined,
+      brandIds: secondaryFilter.brands.length > 0 ? secondaryFilter.brands : undefined,
+      critAirRatings: secondaryFilter.critAir.length > 0 ? secondaryFilter.critAir : undefined,
     };
 
-    // Convert dates to ISO UTC format for backend
-    if (mainFilter.startDate && mainFilter.endDate && mainFilter.startTime && mainFilter.endTime) {
-      const startDateTime = new Date(`${mainFilter.startDate}T${mainFilter.startTime}`);
-      const endDateTime = new Date(`${mainFilter.endDate}T${mainFilter.endTime}`);
+    const hasAllDates = mainFilter.startDate && mainFilter.startTime && mainFilter.endDate && mainFilter.endTime;
+    let valid = false;
 
-      filter.startDate = startDateTime.toISOString();
-      filter.endDate = endDateTime.toISOString();
+    // Only add date filter if EVERYTHING is selected
+    if (hasAllDates) {
+      const startDateTime = new Date(`${mainFilter.startDate}T${mainFilter.startTime}:00`);
+      const endDateTime = new Date(`${mainFilter.endDate}T${mainFilter.endTime}:00`);
+      const currentDateTime = new Date();
+      const oneHourAhead = new Date(currentDateTime.getTime() + 60 * 60 * 1000);
+
+      // Validation Rules
+      if (startDateTime >= oneHourAhead && endDateTime > startDateTime) {
+        const diffHours = (endDateTime.getTime() - startDateTime.getTime()) / 36e5;
+        if (diffHours >= 2) {
+          valid = true;
+          payload.startDate = startDateTime.toISOString();
+          payload.endDate = endDateTime.toISOString();
+        }
+      }
     }
 
-    return filter;
+    return { 
+      filterPayload: payload, 
+      isDateSelected: hasAllDates, 
+      isValidSelection: valid 
+    };
   }, [mainFilter, secondaryFilter]);
 
+  // 📡 QUERY
   const { data, loading } = useQuery(GET_CARS_QUERY, {
-    variables: { filter: carFilter },
+    variables: { filter: filterPayload },
     fetchPolicy: 'cache-and-network'
   });
 
-  // Enhanced time validation functions using date-fns
-  const validatePickupTime = (date: string, time: string) => {
-    const pickupDateTime = new Date(`${date}T${time}`);
-    const now = new Date();
-    const minPickupTime = addHours(now, 1);
+  // --- HANDLERS ---
 
-    if (isBefore(pickupDateTime, minPickupTime)) {
-      setAlertMessage('Pick-up time must be at least 1 hour from now');
-      setAlertSeverity('error');
-      setAlertOpen(true);
-      return false;
-    }
-    return true;
-  };
-
-  const validateReturnTime = (pickupDate: string, pickupTime: string, returnDate: string, returnTime: string) => {
-    const pickupDateTime = new Date(`${pickupDate}T${pickupTime}`);
-    const returnDateTime = new Date(`${returnDate}T${returnTime}`);
-    const minReturnTime = addHours(pickupDateTime, 2);
-
-    if (isBefore(returnDateTime, minReturnTime)) {
-      setAlertMessage('Return time must be at least 2 hours after pick-up time');
-      setAlertSeverity('error');
-      setAlertOpen(true);
-      return false;
-    }
-    return true;
-  };
-
-  // Generate time options in 30-minute intervals
-  const generateTimeOptions = () => {
-    const times = [];
-    for (let hour = 0; hour < 24; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        times.push(timeString);
+  const handleDateChange = (field: 'startDate' | 'endDate', value: string) => {
+    setMainFilter(prev => {
+      const newState = { ...prev, [field]: value };
+      // Auto-fill return date logic if pickup is set but return isn't
+      if (field === 'startDate' && !newState.endDate) {
+         const nextDay = addDays(new Date(value), 2);
+         newState.endDate = format(nextDay, 'yyyy-MM-dd');
       }
-    }
-    return times;
+      return newState;
+    });
   };
 
-  const timeOptions = generateTimeOptions();
-
-  const handlePickupDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newPickupDate = e.target.value;
-    const pickupDate = new Date(newPickupDate);
-    const yesterday = addDays(new Date(), -1);
-
-    // Allow yesterday and future dates
-    if (isBefore(startOfDay(pickupDate), startOfDay(yesterday))) {
-      setAlertMessage('Pick-up date cannot be more than 1 day in the past');
-      setAlertSeverity('error');
-      setAlertOpen(true);
-      return;
-    }
-
-    // Calculate new return date (same day or next day if pickup is today)
-    let newReturnDate = newPickupDate;
-    const pickupDateTime = new Date(`${newPickupDate}T${mainFilter.startTime}`);
-    const returnDateTime = new Date(`${mainFilter.endDate}T${mainFilter.endTime}`);
-
-    // If return date/time is before new pickup date/time, adjust return date
-    if (isBefore(returnDateTime, addHours(pickupDateTime, 2))) {
-      const today = new Date();
-      if (pickupDate.toDateString() === today.toDateString()) {
-        // If pickup is today, keep return on same day but adjust time
-        newReturnDate = newPickupDate;
-      } else {
-        // If pickup is future date, set return to same day
-        newReturnDate = newPickupDate;
-      }
-    }
-
-    setMainFilter(prev => ({
-      ...prev,
-      startDate: newPickupDate,
-      endDate: newReturnDate
-    }));
-  };
-
-  const handlePickupTimeChange = (time: string) => {
-    if (!validatePickupTime(mainFilter.startDate, time)) {
-      return; // Don't update if validation fails
-    }
-
-    // Auto-adjust return time to be at least 2 hours after pickup
-    const pickupDateTime = new Date(`${mainFilter.startDate}T${time}`);
-    let newReturnTime = mainFilter.endTime;
-    let newReturnDate = mainFilter.endDate;
-
-    const currentReturnDateTime = new Date(`${mainFilter.endDate}T${mainFilter.endTime}`);
-    const minReturnDateTime = addHours(pickupDateTime, 2);
-
-    if (isBefore(currentReturnDateTime, minReturnDateTime)) {
-      newReturnTime = format(minReturnDateTime, 'HH:mm');
-      newReturnDate = format(minReturnDateTime, 'yyyy-MM-dd');
-    }
-
-    setMainFilter(prev => ({
-      ...prev,
-      startTime: time,
-      endTime: newReturnTime,
-      endDate: newReturnDate
-    }));
-  };
-
-  const handleReturnDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newReturnDate = e.target.value;
-    const pickupDate = new Date(mainFilter.startDate);
-    const returnDate = new Date(newReturnDate);
-
-    // Return date must be same as or after pickup date
-    if (isBefore(startOfDay(returnDate), startOfDay(pickupDate))) {
-      setAlertMessage('Return date cannot be before pick-up date');
-      setAlertSeverity('error');
-      setAlertOpen(true);
-      return;
-    }
-
-    setMainFilter(prev => ({
-      ...prev,
-      endDate: newReturnDate
-    }));
-  };
-
-  const handleReturnTimeChange = (time: string) => {
-    if (!validateReturnTime(mainFilter.startDate, mainFilter.startTime, mainFilter.endDate, time)) {
-      return; // Don't update if validation fails
-    }
-
-    setMainFilter(prev => ({
-      ...prev,
-      endTime: time
-    }));
+  const handleTimeChange = (field: 'startTime' | 'endTime', value: string) => {
+    setMainFilter(prev => ({ ...prev, [field]: value }));
   };
 
   const handleCheckboxChange = (category: string, value: string) => {
@@ -243,152 +150,106 @@ export default function CarsListingPage() {
     });
   };
 
-  // 🛠️ View Details Logic
-  const handleOpenDetails = (car: any) => {
-    setSelectedCar(car);
-    setDetailsOpen(true);
+  const showAlert = (msg: string, severity: 'warning' | 'error' | 'info') => {
+    setAlertMessage(msg);
+    setAlertSeverity(severity);
+    setAlertOpen(true);
+  };
+
+  const handleBookClick = (car: any) => {
+    // 🛑 STOP: If dates are not selected or invalid
+    if (!isDateSelected || !isValidSelection) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      showAlert('Please select valid Pickup & Return date/time to check availability.', 'warning');
+      
+      // Highlight visuals
+      const dateInputs = document.querySelectorAll('input[type="date"]');
+      if(dateInputs[0]) (dateInputs[0] as HTMLElement).focus();
+      return;
+    }
+
+    handleBookNow(car.id);
   };
 
   const handleBookNow = async (carId: string) => {
-    if (!mainFilter.startDate || !mainFilter.endDate) {
-      setAlertMessage('⚠️ Please enter Pickup and Return date/time before booking!');
-      setAlertSeverity('warning');
-      setAlertOpen(true);
-      setDetailsOpen(false);
-    } else {
-      const getApolloErrorMessage = (err: any) => {
-        // ApolloError shape: { graphQLErrors, networkError, message }
-        const gqlMsg = err?.graphQLErrors?.[0]?.message;
-        if (gqlMsg) return gqlMsg;
-        const netMsg = err?.networkError?.message;
-        if (netMsg) return netMsg;
-        return err?.message || 'Something went wrong. Please try again.';
-      };
+    const startStr = `${mainFilter.startDate}T${mainFilter.startTime}`;
+    const endStr = `${mainFilter.endDate}T${mainFilter.endTime}`;
 
-      // Check if user is authenticated
-      if (status !== 'authenticated') {
-        // Redirect to login with booking URL as callback
-        const bookingUrl = `/booking?carId=${carId}&start=${mainFilter.startDate}T${mainFilter.startTime}&end=${mainFilter.endDate}T${mainFilter.endTime}`;
-        router.push(`/login?redirect=${encodeURIComponent(bookingUrl)}`);
-        return;
-      }
+    if (status !== 'authenticated') {
+      const bookingUrl = `/booking?carId=${carId}&start=${startStr}&end=${endStr}`;
+      router.push(`/login?redirect=${encodeURIComponent(bookingUrl)}`);
+      return;
+    }
 
-      // User is authenticated, create draft booking immediately
-      try {
-        // Find the car data for pricing
-        const selectedCar = data?.cars.find((car: any) => car.id === carId);
-        if (!selectedCar) {
-          setAlertMessage('Car not found. Please refresh and try again.');
-          setAlertSeverity('error');
-          setAlertOpen(true);
-          return;
-        }
+    try {
+      const car = data?.cars.find((c: any) => c.id === carId);
+      if (!car) throw new Error('Car not found');
 
-        // Calculate basic pricing (same logic as booking page)
-        const startDateTime = new Date(`${mainFilter.startDate}T${mainFilter.startTime}`);
-        const endDateTime = new Date(`${mainFilter.endDate}T${mainFilter.endTime}`);
-        const diffHours = Math.ceil((endDateTime.getTime() - startDateTime.getTime()) / (1000 * 60 * 60));
-        const diffDays = Math.ceil((endDateTime.getTime() - startDateTime.getTime()) / (1000 * 60 * 60 * 24));
+      const startDateTime = new Date(`${mainFilter.startDate}T${mainFilter.startTime}:00`);
+      const endDateTime = new Date(`${mainFilter.endDate}T${mainFilter.endTime}:00`);
+      
+      const diffDays = Math.max(1, Math.ceil((endDateTime.getTime() - startDateTime.getTime()) / (1000 * 60 * 60 * 24)));
+      const basePrice = (car.pricePerDay || 0) * diffDays;
 
-        let basePrice = 0;
-        let durationLabel = '';
-
-        if (selectedCar.pricePerHour && selectedCar.pricePerDay) {
-          // Calculate based on duration
-          const diffHours = Math.ceil((endDateTime.getTime() - startDateTime.getTime()) / (1000 * 60 * 60));
-
-          if (diffHours <= 24) {
-            basePrice = (selectedCar.pricePerHour || 0) * diffHours;
-            durationLabel = `${diffHours} hours`;
-          } else {
-            basePrice = (selectedCar.pricePerDay || 0) * diffDays;
-            durationLabel = `${diffDays} days`;
+      const { data: bookingResult } = await createBooking({
+        variables: {
+          input: {
+            carId,
+            startDate: startDateTime.toISOString(),
+            endDate: endDateTime.toISOString(),
+            pickupTime: mainFilter.startTime,
+            returnTime: mainFilter.endTime,
+            basePrice,
+            taxAmount: basePrice * 0.20,
+            totalPrice: basePrice * 1.20,
+            depositAmount: car.depositAmount || 0,
+            bookingType: 'RENTAL'
           }
-        } else {
-          basePrice = (selectedCar.pricePerDay || 0) * diffDays;
-          durationLabel = `${diffDays} days`;
         }
+      });
 
-        // Create draft booking
-        const { data: bookingResult } = await createBooking({
-          variables: {
-            input: {
-              carId: carId,
-              startDate: startDateTime.toISOString(),
-              endDate: endDateTime.toISOString(),
-              basePrice: basePrice,
-              taxAmount: basePrice * 0.20, // 20% tax
-              surchargeAmount: 0, // No surcharge for basic booking
-              totalPrice: basePrice * 1.20,
-              depositAmount: selectedCar.depositAmount || 0,
-              rentalType: diffDays >= 1 ? 'DAY' : 'HOUR',
-              bookingType: 'RENTAL',
-              pickupLocation: '',
-              dropoffLocation: ''
-            }
-          }
-        });
-
-        if (bookingResult?.createBooking?.id) {
-          // Redirect to booking page with the created draft booking
-          router.push(`/booking?bookingId=${bookingResult.createBooking.id}`);
-        } else {
-          setAlertMessage('Failed to create booking. Please try again.');
-          setAlertSeverity('error');
-          setAlertOpen(true);
-        }
-
-      } catch (error: any) {
-        console.error('Error creating booking:', error);
-        setAlertMessage(getApolloErrorMessage(error));
-        setAlertSeverity('error');
-        setAlertOpen(true);
+      if (bookingResult?.createBooking?.id) {
+        // Send selected dates to booking page
+        router.push(`/booking?bookingId=${bookingResult.createBooking.id}&start=${startStr}&end=${endStr}`);
       }
+    } catch (error: any) {
+      showAlert(error.message || 'Booking failed', 'error');
     }
   };
 
   const FilterPanel = () => (
     <Box>
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-        <Typography fontWeight={900} variant="h6">FILTERS</Typography>
-        <Stack direction="row" spacing={1}>
-          {(secondaryFilter.fuelTypes.length > 0 ||
-            secondaryFilter.transmissions.length > 0 ||
-            secondaryFilter.brands.length > 0 ||
-            secondaryFilter.critAir.length > 0) && (
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => setSecondaryFilter({
-                fuelTypes: [],
-                transmissions: [],
-                brands: [],
-                critAir: []
-              })}
-              sx={{ fontSize: '12px', textTransform: 'none' }}
-            >
-              Clear All
-            </Button>
-          )}
-          <IconButton sx={{ display: { md: 'none' } }} onClick={() => setMobileFilterOpen(false)}>
-            <CloseIcon />
-          </IconButton>
-        </Stack>
+        <Typography variant="h6" fontWeight={700}>Filters</Typography>
+        <Button 
+          size="small" 
+          onClick={() => setSecondaryFilter({ fuelTypes: [], transmissions: [], brands: [], critAir: [] })}
+        >
+          Clear
+        </Button>
       </Stack>
       {[
-        { label: 'BRANDS', key: 'brands', data: brandData?.brands },
-        { label: 'TRANSMISSION', key: 'transmissions', data: enumData?.transmissionEnum?.enumValues },
-        { label: 'FUEL TYPE', key: 'fuelTypes', data: enumData?.fuelTypeEnum?.enumValues },
-        { label: 'CRITAIR', key: 'critAir', data: enumData?.critAirEnum?.enumValues },
+        { label: 'Brands', key: 'brands', data: brandData?.brands },
+        { label: 'Transmission', key: 'transmissions', data: enumData?.transmissionEnum?.enumValues },
+        { label: 'Fuel Type', key: 'fuelTypes', data: enumData?.fuelTypeEnum?.enumValues },
       ].map((section) => (
-        <Box key={section.key} sx={{ mb: 2.5 }}>
-          <Typography fontSize={11} fontWeight={800} color="primary" mb={1} sx={{ letterSpacing: 1 }}>{section.label}</Typography>
+        <Box key={section.key} sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" fontWeight={700} color="text.secondary" mb={1}>
+            {section.label}
+          </Typography>
           <FormGroup>
             {section.data?.map((item: any) => (
-              <FormControlLabel 
-                key={item.id || item.name} 
-                control={<Checkbox size="small" checked={secondaryFilter[section.key as keyof typeof secondaryFilter].includes(item.id || item.name)} onChange={() => handleCheckboxChange(section.key, item.id || item.name)} />} 
-                label={<Typography fontSize={13} fontWeight={500}>{item.name.replace('_', ' ')}</Typography>} 
+              <FormControlLabel
+                key={item.id || item.name}
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={secondaryFilter[section.key as keyof typeof secondaryFilter].includes(item.id || item.name)}
+                    onChange={() => handleCheckboxChange(section.key, item.id || item.name)}
+                    sx={{ '&.Mui-checked': { color: '#7C3AED' } }}
+                  />
+                }
+                label={<Typography variant="body2">{item.name.replace('_', ' ')}</Typography>}
               />
             ))}
           </FormGroup>
@@ -399,232 +260,300 @@ export default function CarsListingPage() {
   );
 
   return (
-    <Box sx={{ bgcolor: '#F8FAFC', minHeight: '100vh', pb: 4 }}>
+    <Box sx={{ bgcolor: '#F8FAFC', minHeight: '100vh', pb: 8 }}>
       
-      {/* 🔝 TOP BAR */}
-      <Box sx={{ bgcolor: 'white', borderBottom: '1px solid #E2E8F0', py: 1, position: 'fixed', top: 84, left: 0, right: 0, zIndex: 110 }}>
-        <Container maxWidth="xl">
-          <Paper elevation={0} sx={{ p: 1, borderRadius: 2, border: '1px solid #E2E8F0', bgcolor: '#F8FAFC' }}>
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} md={6}>
-                <Stack direction="row" spacing={1} sx={{ bgcolor: 'white', p: 1, borderRadius: 2, border: '1px solid #CBD5E1' }}>
-                  <Box sx={{ flex: 1.5 }}>
-                    <Typography variant="caption" fontWeight={800} color="primary" ml={1}>PICKUP DATE</Typography>
+      {/* 🟢 1. TOP SEARCH BAR */}
+      <Paper 
+        ref={topBarRef}
+        elevation={0}
+        sx={{ 
+          position: 'fixed', 
+          top: { xs: 56, sm: 64, md: 80 }, 
+          left: 0, 
+          right: 0, 
+          zIndex: 99, 
+          py: 2, 
+          borderBottom: '1px solid #E2E8F0', 
+          borderRadius: 0,
+          bgcolor: 'rgba(255,255,255,0.95)', 
+          backdropFilter: 'blur(10px)'
+        }}
+      >
+        <Container maxWidth="lg">
+          <Grid container justifyContent="center">
+            <Grid item xs={12} md={10} lg={9}>
+               <Paper elevation={0} sx={{ 
+                 display: 'flex', flexDirection: { xs: 'column', md: 'row' }, 
+                 alignItems: 'center', p: 0.5, border: '1px solid #E2E8F0', borderRadius: 4,
+                 bgcolor: 'white', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                 transition: 'border 0.3s',
+                 borderColor: isValidSelection ? '#7C3AED' : 'transparent'
+               }}>
+                  
+                  {/* Pickup Section */}
+                  <Box sx={{ display: 'flex', flex: 1, width: '100%', alignItems: 'center', px: 2, py: 1 }}>
                     <TextField
+                      fullWidth
                       type="date"
                       value={mainFilter.startDate}
-                      onChange={handlePickupDateChange}
-                      size="small"
-                      fullWidth
-                      inputProps={{
-                        min: dayjs().subtract(1, 'day').format('YYYY-MM-DD') // Allow yesterday
+                      onChange={(e) => handleDateChange('startDate', e.target.value)}
+                      placeholder="Pickup Date"
+                      InputProps={{ 
+                        startAdornment: <InputAdornment position="start"><CalendarTodayIcon fontSize="small" sx={{color: mainFilter.startDate ? '#7C3AED' : 'text.secondary'}}/></InputAdornment>,
+                        disableUnderline: true,
+                        sx: { fontSize: '0.95rem', fontWeight: 600 }
                       }}
-                      sx={{
-                        '& .MuiInputBase-root': { border: 'none', '&:before': { border: 'none' }, '&:after': { border: 'none' } },
-                        '& .MuiInputBase-input': { padding: '4px 8px', fontSize: '14px' }
-                      }}
+                      variant="standard"
                     />
+                    <FormControl variant="standard" sx={{ minWidth: 100, ml: 1 }}>
+                      {!mainFilter.startTime && <InputLabel sx={{fontSize: '0.8rem'}}>Time</InputLabel>}
+                      <Select
+                        value={mainFilter.startTime}
+                        onChange={(e) => handleTimeChange('startTime', e.target.value)}
+                        disableUnderline
+                        IconComponent={AccessTimeIcon}
+                        displayEmpty
+                        sx={{ fontSize: '0.95rem', fontWeight: 600, color: '#334155', '& .MuiSvgIcon-root': { color: mainFilter.startTime ? '#7C3AED' : 'text.secondary', fontSize: 20 } }}
+                        MenuProps={{ PaperProps: { sx: { maxHeight: 300, borderRadius: 2 } } }}
+                      >
+                        {TIME_SLOTS.map((time) => (
+                          <MenuItem key={`start-${time}`} value={time}>{time}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                   </Box>
-                  <Divider orientation="vertical" flexItem />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" fontWeight={800} color="primary">TIME</Typography>
+
+                  <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, bgcolor: '#E2E8F0', height: 30, alignSelf: 'center' }} />
+                  <Divider orientation="horizontal" flexItem sx={{ display: { xs: 'block', md: 'none' }, width: '100%' }} />
+
+                  {/* Return Section */}
+                  <Box sx={{ display: 'flex', flex: 1, width: '100%', alignItems: 'center', px: 2, py: 1 }}>
                     <TextField
-                      select
-                      value={mainFilter.startTime}
-                      onChange={(e) => handlePickupTimeChange(e.target.value)}
-                      size="small"
                       fullWidth
-                      sx={{
-                        '& .MuiInputBase-root': { border: 'none', '&:before': { border: 'none' }, '&:after': { border: 'none' } },
-                        '& .MuiInputBase-input': { padding: '4px 0', fontSize: '14px' }
-                      }}
-                    >
-                      {timeOptions.map((time) => (
-                        <MenuItem key={time} value={time}>
-                          {time}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Box>
-                </Stack>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Stack direction="row" spacing={1} sx={{ bgcolor: !mainFilter.startDate ? '#F1F5F9' : 'white', p: 1, borderRadius: 2, border: '1px solid #CBD5E1', opacity: !mainFilter.startDate ? 0.6 : 1 }}>
-                  <Box sx={{ flex: 1.5 }}>
-                    <Typography variant="caption" fontWeight={800} color="primary" ml={1}>RETURN DATE</Typography>
-                    <TextField
                       type="date"
                       value={mainFilter.endDate}
-                      onChange={handleReturnDateChange}
-                      disabled={!mainFilter.startDate}
-                      size="small"
-                      fullWidth
-                      inputProps={{
-                        min: mainFilter.startDate // Cannot be before pickup date
+                      onChange={(e) => handleDateChange('endDate', e.target.value)}
+                      InputProps={{ 
+                        startAdornment: <InputAdornment position="start"><ArrowForwardIcon fontSize="small" sx={{color: mainFilter.endDate ? '#7C3AED' : 'text.secondary'}}/></InputAdornment>,
+                        disableUnderline: true,
+                        sx: { fontSize: '0.95rem', fontWeight: 600 }
                       }}
-                      sx={{
-                        '& .MuiInputBase-root': { border: 'none', '&:before': { border: 'none' }, '&:after': { border: 'none' } },
-                        '& .MuiInputBase-input': { padding: '4px 8px', fontSize: '14px' }
-                      }}
+                      variant="standard"
                     />
+                    <FormControl variant="standard" sx={{ minWidth: 100, ml: 1 }}>
+                      {!mainFilter.endTime && <InputLabel sx={{fontSize: '0.8rem'}}>Time</InputLabel>}
+                      <Select
+                        value={mainFilter.endTime}
+                        onChange={(e) => handleTimeChange('endTime', e.target.value)}
+                        disableUnderline
+                        IconComponent={AccessTimeIcon}
+                        displayEmpty
+                        sx={{ fontSize: '0.95rem', fontWeight: 600, color: '#334155', '& .MuiSvgIcon-root': { color: mainFilter.endTime ? '#7C3AED' : 'text.secondary', fontSize: 20 } }}
+                        MenuProps={{ PaperProps: { sx: { maxHeight: 300, borderRadius: 2 } } }}
+                      >
+                        {TIME_SLOTS.map((time) => (
+                          <MenuItem key={`end-${time}`} value={time}>{time}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                   </Box>
-                  <Divider orientation="vertical" flexItem />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" fontWeight={800} color="primary">TIME</Typography>
-                    <TextField
-                      select
-                      value={mainFilter.endTime}
-                      onChange={(e) => handleReturnTimeChange(e.target.value)}
-                      disabled={!mainFilter.startDate}
-                      size="small"
-                      fullWidth
-                      sx={{
-                        '& .MuiInputBase-root': { border: 'none', '&:before': { border: 'none' }, '&:after': { border: 'none' } },
-                        '& .MuiInputBase-input': { padding: '4px 0', fontSize: '14px' }
-                      }}
-                    >
-                      {timeOptions.map((time) => (
-                        <MenuItem key={time} value={time}>
-                          {time}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Box>
-                </Stack>
-              </Grid>
+
+                  {/* Search Button */}
+                  <Button 
+                    variant="contained" 
+                    onClick={() => { 
+                      if(!isValidSelection) {
+                        showAlert('Please select valid pickup and return dates/times (Min 2 hours).', 'info');
+                      }
+                    }}
+                    sx={{ 
+                      borderRadius: 3, height: 48, px: 4, 
+                      ml: { md: 1 }, width: { xs: '100%', md: 'auto' }, 
+                      bgcolor: isValidSelection ? '#0F172A' : '#E2E8F0', 
+                      color: isValidSelection ? 'white' : '#64748B',
+                      fontWeight: 700, textTransform: 'none',
+                      '&:hover': { bgcolor: isValidSelection ? '#334155' : '#E2E8F0' }
+                    }}
+                  >
+                    {isValidSelection ? 'Update' : 'Check'}
+                  </Button>
+               </Paper>
             </Grid>
-          </Paper>
 
-          {/* Mobile Filter Button */}
-          <Box sx={{ display: { xs: 'block', md: 'none' }, mt: 2, textAlign: 'center' }}>
-            <Button
-              variant="contained"
-              startIcon={<FilterListIcon />}
-              onClick={() => setMobileFilterOpen(true)}
-              sx={{
-                borderRadius: 3,
-                fontWeight: 800,
-                textTransform: 'none',
-                px: 3,
-                py: 1.5,
-                boxShadow: '0 4px 14px 0 rgba(37, 99, 235, 0.39)',
-                position: 'relative'
-              }}
-            >
-              Filters
-              {(secondaryFilter.fuelTypes.length > 0 ||
-                secondaryFilter.transmissions.length > 0 ||
-                secondaryFilter.brands.length > 0 ||
-                secondaryFilter.critAir.length > 0) && (
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    top: -8,
-                    right: -8,
-                    bgcolor: 'error.main',
-                    borderRadius: '50%',
-                    width: 20,
-                    height: 20,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Typography variant="caption" fontWeight="bold" color="white">
-                    {(secondaryFilter.fuelTypes.length +
-                      secondaryFilter.transmissions.length +
-                      secondaryFilter.brands.length +
-                      secondaryFilter.critAir.length)}
-                  </Typography>
-                </Box>
-              )}
-            </Button>
-          </Box>
+            {/* Mobile Filter Toggle */}
+            <Grid item xs={12} sx={{ display: { md: 'none' } }}>
+              <Button 
+                fullWidth 
+                variant="outlined" 
+                startIcon={<TuneIcon />} 
+                onClick={() => setMobileFilterOpen(true)}
+                sx={{ borderRadius: 4, borderColor: '#E2E8F0', color: '#0F172A', bgcolor: 'white' }}
+              >
+                Filters ({secondaryFilter.fuelTypes.length + secondaryFilter.transmissions.length})
+              </Button>
+            </Grid>
+          </Grid>
         </Container>
-      </Box>
+      </Paper>
 
-      <Container maxWidth="xl" sx={{ mt: { xs: 20, md: 16 } }}>
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={3} sx={{ display: { xs: 'none', md: 'block' } }}>
-            <Box sx={{ position: 'sticky', top: 240 }}><FilterPanel /></Box>
+      {/* 2. MAIN CONTENT AREA */}
+      <Container maxWidth="xl" sx={{ mt: { xs: 30, md: 20 } }}>
+        <Grid container spacing={4}>
+          
+          {/* Sidebar */}
+          <Grid item md={3} sx={{ display: { xs: 'none', md: 'block' } }}>
+            <Paper sx={{ p: 3, position: 'sticky', top: 180, borderRadius: 4, border: '1px solid #E2E8F0', boxShadow: 'none' }}>
+              <FilterPanel />
+            </Paper>
           </Grid>
 
+          {/* Results Grid */}
           <Grid item xs={12} md={9}>
-            <Grid container spacing={1.5}>
-              {loading ? [1, 2, 3, 4].map(i => <Grid item xs={12} sm={6} key={i}><Skeleton variant="rectangular" height={250} sx={{ borderRadius: 4 }} /></Grid>) :
-                data?.cars.map((car: any) => (
-                  <Grid item xs={12} sm={6} key={car.id}>
-                    <Card elevation={0} sx={{ borderRadius: 3, border: '1px solid #E2E8F0', '&:hover': { transform: 'translateY(-2px)', transition: '0.3s', boxShadow: '0 8px 20px rgba(0,0,0,0.06)' } }}>
-                      {/* Primary Image */}
-                      {car.images?.length > 0 && (
-                        <Box sx={{ position: 'relative', height: 140, overflow: 'hidden', borderRadius: '12px 12px 0 0' }}>
-                          <img
-                            src={(car.images.find((img: any) => img.isPrimary)?.imagePath || car.images[0].imagePath)}
-                            alt={`${car.brand.name} ${car.model.name}`}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover'
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+              <Typography variant="h5" fontWeight={800} color="#0F172A">
+                {loading ? 'Fetching cars...' : `${data?.cars?.length || 0} Cars Available`}
+              </Typography>
+              {!isValidSelection && (
+                <Chip label="Browsing Mode - Select dates to check availability" color="default" size="small" variant="outlined" />
+              )}
+            </Box>
+
+            <Grid container spacing={3}>
+              {data?.cars?.map((car: any) => (
+                <Grid item xs={12} sm={6} lg={4} key={car.id}>
+                  <Card 
+                    elevation={0}
+                    sx={{ 
+                      height: '100%', display: 'flex', flexDirection: 'column',
+                      borderRadius: 4, border: '1px solid #E2E8F0',
+                      transition: 'all 0.3s', bgcolor: 'white',
+                      '&:hover': { transform: 'translateY(-5px)', boxShadow: '0 12px 30px -10px rgba(0,0,0,0.1)', borderColor: '#7C3AED' }
+                    }}
+                  >
+                    <Box sx={{ p: 2.5, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Box>
+                        <Typography variant="overline" color="text.secondary" fontWeight={700} sx={{ letterSpacing: 1 }}>
+                          {car.brand.name}
+                        </Typography>
+                        <Typography variant="h6" fontWeight={800} lineHeight={1.2} color="#0F172A">
+                          {car.model.name}
+                        </Typography>
+                      </Box>
+                      <IconButton size="small"><FavoriteBorderIcon fontSize="small" /></IconButton>
+                    </Box>
+
+                    <Box sx={{ height: 180, position: 'relative', my: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <img
+                        src={car.images?.[0]?.url || '/placeholder.jpg'}
+                        alt={car.model.name}
+                        style={{ width: '90%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 10px 10px rgba(0,0,0,0.1))' }}
+                      />
+                    </Box>
+
+                    <Box sx={{ p: 2.5, flexGrow: 1 }}>
+                      <Stack direction="row" spacing={1} sx={{ mb: 3 }}>
+                        <Chip size="small" icon={<SettingsIcon sx={{fontSize:14}}/>} label={car.transmission} sx={{bgcolor:'#F8FAFC', fontWeight:600}} />
+                        <Chip size="small" icon={<LocalGasStationIcon sx={{fontSize:14}}/>} label={car.fuelType} sx={{bgcolor:'#F8FAFC', fontWeight:600}} />
+                        <Chip size="small" icon={<EventSeatIcon sx={{fontSize:14}}/>} label={car.seats} sx={{bgcolor:'#F8FAFC', fontWeight:600}} />
+                      </Stack>
+                      
+                      <Divider sx={{ my: 2, borderStyle: 'dashed' }} />
+
+                      <Box display="flex" alignItems="center" justifyContent="space-between">
+                        <Box>
+                          <Typography variant="h6" fontWeight={800} color="#0F172A">
+                            €{car.pricePerDay?.toFixed(0)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" fontWeight={600}>/ day</Typography>
+                        </Box>
+                        <Stack direction="row" spacing={1}>
+                          <Button size="small" variant="outlined" onClick={() => { setSelectedCar(car); setDetailsOpen(true); }} sx={{ borderRadius: 3, borderColor: '#E2E8F0', color: '#64748B', fontWeight: 700 }}>
+                            Details
+                          </Button>
+                          <Button 
+                            size="small" 
+                            variant="contained" 
+                            onClick={() => handleBookClick(car)}
+                            sx={{ 
+                              borderRadius: 3, 
+                              bgcolor: isValidSelection ? '#7C3AED' : '#94A3B8', 
+                              boxShadow: 'none', fontWeight: 700, 
+                              '&:hover': { bgcolor: isValidSelection ? '#6D28D9' : '#94A3B8' } 
                             }}
-                          />
-                        </Box>
-                      )}
-                      <CardContent sx={{ p: 1.5 }}>
-                        <Box sx={{ mb: 1.5 }}>
-                          <Typography fontSize={10} fontWeight={800} color="primary">{car.brand.name.toUpperCase()}</Typography>
-                          <Typography variant="h6" fontWeight={900}>{car.model.name}</Typography>
-                        </Box>
-                        <Stack direction="row" spacing={1} mb={1.5}>
-                          <Chip icon={<SettingsIcon sx={{ fontSize: 12 }} />} label={car.transmission} size="small" variant="outlined" />
-                          <Chip icon={<LocalGasStationIcon sx={{ fontSize: 12 }} />} label={car.fuelType} size="small" variant="outlined" />
+                          >
+                            {isValidSelection ? 'Book Now' : 'Check Dates'}
+                          </Button>
                         </Stack>
-                        <Divider sx={{ mb: 1.5, borderStyle: 'dashed' }} />
-                        <Stack direction="row" justifyContent="space-between" alignItems="center">
-                          <Typography fontWeight={900} fontSize={22}>€{car.pricePerDay}<Typography component="span" fontSize={12}>/day</Typography></Typography>
-                          <Stack direction="row" spacing={1}>
-                            <Button size="small" variant="outlined" onClick={() => handleOpenDetails(car)} sx={{ fontWeight: 800, borderRadius: 2, textTransform: 'none' }}>Details</Button>
-                            <Button size="small" variant="contained" onClick={() => handleBookNow(car.id)} sx={{ fontWeight: 800, borderRadius: 2, bgcolor: mainFilter.endDate ? '#2563EB' : '#94A3B8' }}>Book Now</Button>
-                          </Stack>
-                        </Stack>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))
-              }
+                      </Box>
+                    </Box>
+                  </Card>
+                </Grid>
+              ))}
             </Grid>
           </Grid>
         </Grid>
       </Container>
 
-      {/* 🚀 VIEW DETAILS POP-UP */}
-      <Dialog fullWidth maxWidth="md" open={detailsOpen} TransitionComponent={Transition} onClose={() => setDetailsOpen(false)} PaperProps={{ sx: { borderRadius: 4, p: 2 } }}>
-        <IconButton onClick={() => setDetailsOpen(false)} sx={{ position: 'absolute', right: 16, top: 16, zIndex: 1, bgcolor: '#F1F5F9' }}><CloseIcon /></IconButton>
+      {/* Details Popup */}
+      <Dialog 
+        open={detailsOpen} 
+        onClose={() => setDetailsOpen(false)}
+        maxWidth="md"
+        fullWidth
+        TransitionComponent={Transition}
+        PaperProps={{ sx: { borderRadius: 4 } }}
+      >
         {selectedCar && (
-          <DialogContent>
-            <Grid container spacing={4}>
-              <Grid item xs={12} md={6}>
-                <Box sx={{ borderRadius: 3, overflow: 'hidden', height: { xs: 200, md: 350 }, bgcolor: '#F1F5F9' }}>
-                  <img src={selectedCar.images?.[0]?.imagePath || ''} alt="car" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </Box>
+          <DialogContent sx={{ p: 0 }}>
+            <Box display="flex" justifyContent="flex-end" p={1} position="absolute" right={0} zIndex={10}>
+              <IconButton onClick={() => setDetailsOpen(false)} sx={{ bgcolor: 'white' }}><CloseIcon /></IconButton>
+            </Box>
+            <Grid container>
+              <Grid item xs={12} md={6} sx={{ bgcolor: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 350 }}>
+                 <img 
+                    src={selectedCar.images?.[0]?.url} 
+                    style={{ width: '90%', height: 'auto', objectFit: 'contain' }} 
+                    alt="Car" 
+                  />
               </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography variant="overline" color="primary" fontWeight={900}>{selectedCar.brand.name}</Typography>
-                <Typography variant="h4" fontWeight={900} mb={2}>{selectedCar.model.name}</Typography>
-                <Stack direction="row" spacing={1} mb={3}>
-                  <Chip label={selectedCar.transmission} icon={<SettingsIcon />} />
-                  <Chip label={selectedCar.fuelType} icon={<LocalGasStationIcon />} />
-                  <Chip label={`${selectedCar.seats} Seats`} icon={<EventSeatIcon />} />
-                </Stack>
+              <Grid item xs={12} md={6} sx={{ p: 5 }}>
+                <Typography variant="overline" color="primary" fontWeight={800}>{selectedCar.brand.name}</Typography>
+                <Typography variant="h4" fontWeight={800} color="#0F172A">{selectedCar.model.name}</Typography>
                 
-                <Typography variant="h6" fontWeight={800} mb={1}>Pricing Options</Typography>
-                <Stack spacing={1} mb={3}>
-                  {selectedCar.pricePerHour > 0 && <Paper variant="outlined" sx={{ p: 1, px: 2, display: 'flex', justifyContent: 'space-between', borderRadius: 2 }}><Typography fontSize={13} fontWeight={700}>Per Hour</Typography><Typography fontWeight={900} color="primary">€{selectedCar.pricePerHour}</Typography></Paper>}
-                  {selectedCar.pricePerDay > 0 && <Paper variant="outlined" sx={{ p: 1, px: 2, display: 'flex', justifyContent: 'space-between', borderRadius: 2 }}><Typography fontSize={13} fontWeight={700}>Per Day</Typography><Typography fontWeight={900} color="primary">€{selectedCar.pricePerDay}</Typography></Paper>}
-                  {selectedCar.pricePerKm > 0 && <Paper variant="outlined" sx={{ p: 1, px: 2, display: 'flex', justifyContent: 'space-between', borderRadius: 2 }}><Typography fontSize={13} fontWeight={700}>Per KM</Typography><Typography fontWeight={900} color="primary">€{selectedCar.pricePerKm}</Typography></Paper>}
+                <Stack direction="row" spacing={1} mt={2}>
+                   <Chip label={selectedCar.transmission} />
+                   <Chip label={selectedCar.fuelType} />
+                   <Chip label={`${selectedCar.seats} Seats`} />
                 </Stack>
 
-                <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>Deposit: <b>€{selectedCar.depositAmount}</b></Alert>
-                <Button fullWidth variant="contained" size="large" onClick={() => handleBookNow(selectedCar.id)} sx={{ borderRadius: 3, fontWeight: 900, py: 1.5 }}>Book Now</Button>
+                <Stack spacing={2} mt={4}>
+                   <Box display="flex" justifyContent="space-between" borderBottom="1px dashed #E2E8F0" pb={1}>
+                      <Typography color="text.secondary" fontWeight={500}>Daily Rate</Typography>
+                      <Typography fontWeight={700}>€{selectedCar.pricePerDay}</Typography>
+                   </Box>
+                   <Box display="flex" justifyContent="space-between" borderBottom="1px dashed #E2E8F0" pb={1}>
+                      <Typography color="text.secondary" fontWeight={500}>Daily KM Limit</Typography>
+                      <Typography fontWeight={700}>{selectedCar.dailyKmLimit || 'Unlimited'}</Typography>
+                   </Box>
+                   <Box display="flex" justifyContent="space-between" borderBottom="1px dashed #E2E8F0" pb={1}>
+                      <Typography color="text.secondary" fontWeight={500}>Security Deposit</Typography>
+                      <Typography fontWeight={700}>€{selectedCar.depositAmount}</Typography>
+                   </Box>
+                </Stack>
+
+                <Button 
+                  fullWidth 
+                  variant="contained" 
+                  size="large"
+                  onClick={() => handleBookClick(selectedCar)}
+                  sx={{ 
+                    mt: 5, 
+                    bgcolor: isValidSelection ? '#7C3AED' : '#94A3B8', 
+                    py: 1.5, borderRadius: 3, fontWeight: 700 
+                  }}
+                >
+                  {isValidSelection ? 'Proceed to Booking' : 'Select Dates First'}
+                </Button>
               </Grid>
             </Grid>
           </DialogContent>
@@ -635,21 +564,17 @@ export default function CarsListingPage() {
         anchor="left"
         open={mobileFilterOpen}
         onClose={() => setMobileFilterOpen(false)}
-        PaperProps={{
-          sx: {
-            width: { xs: '85vw', sm: '70vw', md: '400px' },
-            p: 3,
-            borderRadius: '0 20px 20px 0'
-          }
-        }}
-        ModalProps={{
-          keepMounted: true, // Better performance on mobile
-        }}
+        PaperProps={{ sx: { width: '85vw', p: 3 } }}
       >
+        <Box display="flex" justifyContent="space-between" mb={2}>
+           <Typography variant="h6" fontWeight={700}>Filters</Typography>
+           <IconButton onClick={() => setMobileFilterOpen(false)}><CloseIcon /></IconButton>
+        </Box>
         <FilterPanel />
       </Drawer>
-      <Snackbar open={alertOpen} autoHideDuration={5000} onClose={() => setAlertOpen(false)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        <Alert severity={alertSeverity} variant="filled">{alertMessage}</Alert>
+
+      <Snackbar open={alertOpen} autoHideDuration={4000} onClose={() => setAlertOpen(false)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert severity={alertSeverity} variant="filled" sx={{ borderRadius: 2 }}>{alertMessage}</Alert>
       </Snackbar>
     </Box>
   );

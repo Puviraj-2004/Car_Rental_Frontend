@@ -76,7 +76,7 @@ export default function AdminDashboard() {
     { title: 'Total Cars', value: dashboardData.totalCars, icon: CarsIcon, color: '#293D91' },
     { title: 'Total Users', value: dashboardData.totalUsers, icon: UsersIcon, color: '#059669' },
     { title: 'Total Bookings', value: dashboardData.totalBookings, icon: BookingsIcon, color: '#F59E0B' },
-    { title: 'Total Revenue', value: `€${dashboardData.totalRevenue}`, icon: PaymentIcon, color: '#EC4899' },
+    { title: 'Total Revenue', value: `€${dashboardData.totalRevenue?.toFixed(2)}`, icon: PaymentIcon, color: '#EC4899' },
   ];
 
   return (

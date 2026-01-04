@@ -3,9 +3,9 @@
 import React, { useState } from 'react';
 import {
   Box, TextField, Button, Select, MenuItem, FormControl, InputLabel,
-  Grid, Paper, Tab, Tabs, Snackbar, Alert, Autocomplete, Stack, Typography, CircularProgress
+  Grid, Paper, Tab, Tabs, Snackbar, Alert, Autocomplete, Stack, Typography, CircularProgress, IconButton
 } from '@mui/material';
-import { DirectionsCar, Euro, PhotoCamera, Save, CloudUpload } from '@mui/icons-material';
+import { DirectionsCar, Euro, PhotoCamera, Save, CloudUpload, Delete as DeleteIcon } from '@mui/icons-material';
 import { useMutation, useQuery } from '@apollo/client';
 import { useRouter } from 'next/navigation';
 
@@ -16,6 +16,7 @@ export default function AddCarPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Prevent double submissions
   const [alert, setAlert] = useState({ open: false, msg: '', severity: 'info' as any });
 
   // --- Queries ---
@@ -24,20 +25,22 @@ export default function AddCarPage() {
 
   // --- Form State ---
   const [formData, setFormData] = useState({
-    brandId: '', modelId: '', year: new Date().getFullYear(),
+    brandId: '', // Brand selection for model filtering
+    modelId: '', year: new Date().getFullYear(),
     plateNumber: '', fuelType: '', transmission: '',
-    seats: 5, pricePerHour: 0, pricePerDay: 0,
-    depositAmount: 0,
-    requiredLicenseCategory: 'B',
+    seats: 5, // Number of seats
+    requiredLicense: '', // License category required to drive this car
+    pricePerDay: 0, depositAmount: 0,
     // KM Limits & Meter Tracking
     dailyKmLimit: null as number | null,
-    extraKmCharge: null as number | null,
-    currentMileage: 0,
-    critAirRating: '', status: 'AVAILABLE', descriptionEn: '', descriptionFr: ''
+    extraKmCharge: 0,
+    currentOdometer: 0,
+    critAirRating: '', status: ''
   });
 
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [primaryImageIndex, setPrimaryImageIndex] = useState(0);
 
   const { data: modelData } = useQuery(GET_MODELS_QUERY, {
     variables: { brandId: formData.brandId },
@@ -55,7 +58,7 @@ export default function AddCarPage() {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: ['year', 'seats', 'pricePerHour', 'pricePerDay', 'depositAmount', 'dailyKmLimit', 'extraKmCharge', 'currentMileage'].includes(name) ? (value === '' ? null : Number(value)) : value
+      [name]: ['year', 'pricePerDay', 'depositAmount', 'dailyKmLimit', 'extraKmCharge', 'currentOdometer', 'seats'].includes(name) ? (value === '' ? null : Number(value)) : value
     }));
   };
 
@@ -69,18 +72,44 @@ export default function AddCarPage() {
     });
   };
 
+  const handleRemoveNewImage = (index: number) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+
+    // Adjust primary image index if needed
+    if (primaryImageIndex === index) {
+      setPrimaryImageIndex(0);
+    } else if (primaryImageIndex > index) {
+      setPrimaryImageIndex(prev => prev - 1);
+    }
+  };
+
   const handleSubmit = async () => {
-    // Basic Validation
-    if (!formData.brandId || !formData.modelId || !formData.plateNumber) {
-      setAlert({ open: true, msg: 'Please fill all required fields!', severity: 'warning' });
+    // Prevent double submissions
+    if (isSubmitting || loading) {
+      return;
+    }
+
+    // Clear any existing alerts to prevent showing stale error messages
+    setAlert({ open: false, msg: '', severity: 'info' });
+
+    // Set submitting state immediately before any other logic
+    setIsSubmitting(true);
+
+    // Basic Validation - Schema Required Fields
+    if (!formData.modelId || !formData.plateNumber || !formData.pricePerDay || formData.currentOdometer === 0 || !formData.critAirRating || !formData.status || !formData.requiredLicense || !formData.seats) {
+      setAlert({ open: true, msg: 'Please fill all required fields: Model, Plate Number, Price Per Day, Current Odometer, Crit Air Rating, Seats, License Category, and Status!', severity: 'warning' });
+      setIsSubmitting(false);
       return;
     }
 
     setLoading(true);
     try {
       // 1. கார் விவரங்களை உருவாக்குதல்
-      const { data } = await createCar({ 
-        variables: { input: { ...formData } } 
+      // Remove brandId from formData as it's not part of CreateCarInput
+      const { brandId, ...carInput } = formData;
+      const { data } = await createCar({
+        variables: { input: carInput }
       });
 
       const carId = data?.createCar?.id;
@@ -92,7 +121,7 @@ export default function AddCarPage() {
         try {
           for (let i = 0; i < selectedImages.length; i++) {
             const file = selectedImages[i];
-            const res = await uploadImage({ variables: { carId, file, isPrimary: i === 0 } });
+            const res = await uploadImage({ variables: { carId, file, isPrimary: i === primaryImageIndex } });
             const created = res?.data?.addCarImage;
             if (created?.id) uploadedIds.push(created.id);
           }
@@ -100,9 +129,9 @@ export default function AddCarPage() {
         } catch (err: any) {
           // Rollback: delete the created car (server will remove uploaded images too)
           try { await deleteCar({ variables: { id: carId } }); } catch (rollbackErr) { console.error('Rollback delete failed', rollbackErr); }
-          const message = err?.message || 'Image upload failed; car creation rolled back.';
-          setAlert({ open: true, msg: message, severity: 'error' });
+          setAlert({ open: true, msg: err?.message || 'Image upload failed; car creation rolled back.', severity: 'error' });
           setLoading(false);
+          setIsSubmitting(false);
           return;
         }
       } else {
@@ -111,18 +140,33 @@ export default function AddCarPage() {
       setTimeout(() => router.push('/admin/cars'), 1500);
 
     } catch (e: any) {
-      // 🛑 பிழை மேலாண்மை (User Friendly Error Handling)
+      // 🛑 User Friendly Error Handling (English)
+
       let displayError = e.message;
 
-      if (displayError.includes('plateNumber')) {
-        displayError = "இந்த நம்பர் பிளேட் (Plate Number) ஏற்கனவே உள்ளது! தயவுசெய்து சரிபார்க்கவும்.";
+      // Check for Prisma unique constraint error (P2002) specifically for duplicate plate numbers
+      const isUniqueConstraintError = e.graphQLErrors?.some((error: any) =>
+        error.extensions?.code === 'P2002' &&
+        error.message?.includes('plateNumber')
+      );
+
+      if (isUniqueConstraintError) {
+        displayError = "This plate number already exists! Please check and try a different one.";
       } else if (displayError.includes('createReadStream')) {
-        displayError = "Image Upload Error: சர்வர் அமைப்புகளை சரிபார்க்கவும்.";
+        displayError = "Image Upload Error: Please check server settings and try again.";
+      } else if (displayError.includes('Field "brandId" is not defined')) {
+        displayError = "Car creation failed due to invalid data. Please refresh the page and try again.";
+      } else if (displayError.includes('GraphQL error')) {
+        displayError = "Server error occurred. Please try again or contact support.";
+      } else {
+        // Fallback: show the raw error for debugging
+        displayError = `Error: ${displayError}`;
       }
 
       setAlert({ open: true, msg: displayError, severity: 'error' });
     } finally {
       setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -143,16 +187,16 @@ export default function AddCarPage() {
         <Box sx={{ flex: 1, overflowY: 'auto', p: { xs: 2, sm: 4 } }}>
           {activeTab === 0 && (
             <Grid container spacing={2}>
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} md={6}>
                 <Autocomplete
                   options={brandData?.brands || []}
                   getOptionLabel={(opt: any) => opt.name}
                   value={brandData?.brands?.find((b: any) => b.id === formData.brandId) || null}
                   onChange={(_, v: any) => setFormData({ ...formData, brandId: v?.id || '', modelId: '' })}
-                  renderInput={(p) => <TextField {...p} label="Brand" size="small" required fullWidth />}
+                  renderInput={(p) => <TextField {...p} label="Brand" size="small" fullWidth />}
                 />
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} md={6}>
                 <Autocomplete
                   disabled={!formData.brandId}
                   options={modelData?.models || []}
@@ -162,73 +206,108 @@ export default function AddCarPage() {
                   renderInput={(p) => <TextField {...p} label="Model" size="small" required fullWidth />}
                 />
               </Grid>
-              <Grid item xs={6} md={4}>
-                <TextField fullWidth label="Year" name="year" type="number" size="small" value={formData.year} onChange={handleInputChange} />
+              <Grid item xs={6} md={3}>
+                <TextField fullWidth label="Year" name="year" type="number" size="small" required value={formData.year} onChange={handleInputChange} />
               </Grid>
-              <Grid item xs={12} md={4}>
-                <TextField fullWidth label="Plate Number" name="plateNumber" size="small" required value={formData.plateNumber} onChange={handleInputChange} />
-              </Grid>
-              <Grid item xs={6} md={4}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Fuel</InputLabel>
-                  <Select name="fuelType" value={formData.fuelType} label="Fuel" onChange={handleInputChange}>
-                    {enumData?.fuelTypeEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>)}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={6} md={4}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Transmission</InputLabel>
-                  <Select name="transmission" value={formData.transmission} label="Transmission" onChange={handleInputChange}>
-                    {enumData?.transmissionEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>)}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={6} md={4}>
-                <FormControl fullWidth size="small">
+              <Grid item xs={6} md={3}>
+                <FormControl fullWidth size="small" required>
                   <InputLabel>CritAir</InputLabel>
                   <Select name="critAirRating" value={formData.critAirRating} label="CritAir" onChange={handleInputChange}>
                     {enumData?.critAirEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>)}
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={6} md={4}>
+              <Grid item xs={12} md={6}>
+                <TextField fullWidth label="Plate Number" name="plateNumber" size="small" required value={formData.plateNumber} onChange={handleInputChange} />
+              </Grid>
+              <Grid item xs={6} md={3}>
                 <FormControl fullWidth size="small">
-                  <InputLabel>Required License</InputLabel>
-                  <Select
-                    name="requiredLicenseCategory"
-                    value={formData.requiredLicenseCategory}
-                    label="Required License"
-                    onChange={handleInputChange}
-                  >
-                    {(enumData?.licenseCategoryEnum?.enumValues || [{ name: 'B' }]).map((e: any) => (
-                      <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>
-                    ))}
+                  <InputLabel>Fuel Type</InputLabel>
+                  <Select name="fuelType" value={formData.fuelType} label="Fuel Type" onChange={handleInputChange}>
+                    {enumData?.fuelTypeEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>)}
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={6} md={4}>
-                <TextField fullWidth label="Seats" name="seats" type="number" size="small" value={formData.seats} onChange={handleInputChange} />
+              <Grid item xs={6} md={3}>
+                <FormControl fullWidth size="small" required>
+                  <InputLabel>Transmission</InputLabel>
+                  <Select name="transmission" value={formData.transmission} label="Transmission" onChange={handleInputChange}>
+                    {enumData?.transmissionEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={6} md={3}>
+                <TextField
+                  fullWidth
+                  label="Seats"
+                  name="seats"
+                  type="number"
+                  size="small"
+                  required
+                  value={formData.seats}
+                  onChange={handleInputChange}
+                  inputProps={{ min: 1, max: 10 }}
+                />
+              </Grid>
+              <Grid item xs={6} md={3}>
+                <FormControl fullWidth size="small" required>
+                  <InputLabel>License Category</InputLabel>
+                  <Select name="requiredLicense" value={formData.requiredLicense} label="License Category" onChange={handleInputChange}>
+                    {enumData?.licenseCategoryEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth size="small" required>
+                  <InputLabel>Status</InputLabel>
+                  <Select name="status" value={formData.status} label="Status" onChange={handleInputChange}>
+                    {enumData?.carStatusEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>)}
+                  </Select>
+                </FormControl>
               </Grid>
             </Grid>
           )}
 
           {activeTab === 1 && (
             <Grid container spacing={3}>
-              <Grid item xs={6}>
-                <TextField fullWidth size="small" label="Per Hour (€)" name="pricePerHour" type="number" value={formData.pricePerHour} onChange={handleInputChange} />
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: '#293D91' }}>
+                  💰 Pricing & Deposits
+                </Typography>
               </Grid>
-              <Grid item xs={6}>
-                <TextField fullWidth size="small" label="Per Day (€)" name="pricePerDay" type="number" value={formData.pricePerDay} onChange={handleInputChange} />
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Price Per Day (€)"
+                  name="pricePerDay"
+                  type="number"
+                  required
+                  value={formData.pricePerDay ? formData.pricePerDay.toFixed(2) : ''}
+                  onChange={handleInputChange}
+                  InputProps={{ startAdornment: '€' }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Security Deposit (€)"
+                  name="depositAmount"
+                  type="number"
+                  value={formData.depositAmount ? formData.depositAmount.toFixed(2) : ''}
+                  onChange={handleInputChange}
+                  helperText="Required for insurance franchise"
+                  InputProps={{ startAdornment: '€' }}
+                />
               </Grid>
 
-              {/* KM Limits & Meter Tracking Section */}
               <Grid item xs={12}>
-                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: '#293D91' }}>
+                <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: '#293D91' }}>
                   🚗 KM Limits & Meter Tracking
                 </Typography>
               </Grid>
-              <Grid item xs={6}>
+              <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
                   size="small"
@@ -243,14 +322,15 @@ export default function AddCarPage() {
                   }}
                 />
               </Grid>
-              <Grid item xs={6}>
+              <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
                   size="small"
                   label="Extra KM Charge (€)"
                   name="extraKmCharge"
                   type="number"
-                  value={formData.extraKmCharge || ''}
+                  required
+                  value={formData.extraKmCharge ? formData.extraKmCharge.toFixed(2) : ''}
                   onChange={handleInputChange}
                   helperText="Cost per additional KM"
                   InputProps={{
@@ -262,26 +342,14 @@ export default function AddCarPage() {
                 <TextField
                   fullWidth
                   size="small"
-                  label="Current Mileage (km)"
-                  name="currentMileage"
+                  label="Current Odometer (km)"
+                  name="currentOdometer"
                   type="number"
-                  value={formData.currentMileage ?? ''}
+                  required
+                  value={formData.currentOdometer || ''}
                   onChange={handleInputChange}
                   helperText="Starting odometer reading"
-                  required
                 />
-              </Grid>
-
-              <Grid item xs={12}>
-                <TextField fullWidth size="small" label="Security Deposit (€)" name="depositAmount" type="number" required value={formData.depositAmount} onChange={handleInputChange} helperText="Required for insurance franchise" />
-              </Grid>
-              <Grid item xs={12}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Availability Status</InputLabel>
-                  <Select name="status" value={formData.status} label="Availability Status" onChange={handleInputChange}>
-                    {enumData?.carStatusEnum?.enumValues.map((e: any) => <MenuItem key={e.name} value={e.name}>{e.name}</MenuItem>)}
-                  </Select>
-                </FormControl>
               </Grid>
             </Grid>
           )}
@@ -296,9 +364,12 @@ export default function AddCarPage() {
               <Grid container spacing={1} sx={{ mt: 3 }}>
                 {imagePreviews.map((p, i) => (
                   <Grid item xs={3} sm={2} key={i}>
-                    <Box sx={{ position: 'relative', height: 80, borderRadius: 2, overflow: 'hidden', border: i === 0 ? '2px solid #293D91' : '1px solid #E2E8F0' }}>
+                    <Box sx={{ position: 'relative', height: 80, borderRadius: 2, overflow: 'hidden', border: i === primaryImageIndex ? '2px solid #293D91' : '1px solid #E2E8F0', cursor: 'pointer' }} onClick={() => setPrimaryImageIndex(i)}>
                       <img src={p} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="car" />
-                      {i === 0 && <Box sx={{ position: 'absolute', bottom: 0, width: '100%', bgcolor: '#293D91', color: 'white', fontSize: '10px' }}>MAIN</Box>}
+                      {i === primaryImageIndex && <Box sx={{ position: 'absolute', bottom: 0, width: '100%', bgcolor: '#293D91', color: 'white', fontSize: '10px' }}>MAIN</Box>}
+                      <IconButton onClick={(e) => { e.stopPropagation(); handleRemoveNewImage(i); }} size="small" sx={{ position: 'absolute', top: 2, right: 2, bgcolor: 'rgba(255,0,0,0.7)', color: 'white', '&:hover': { bgcolor: 'rgba(255,0,0,0.9)' } }}>
+                        <DeleteIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
                     </Box>
                   </Grid>
                 ))}
@@ -310,8 +381,8 @@ export default function AddCarPage() {
         {/* FOOTER */}
         <Box sx={{ p: { xs: 2, sm: 2 }, borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
           <Button onClick={() => router.back()} color="inherit">Cancel</Button>
-          <Button variant="contained" onClick={handleSubmit} disabled={loading} startIcon={<Save />} sx={{ bgcolor: '#293D91' }}>
-            {loading ? <CircularProgress size={20} color="inherit" /> : "Add Car"}
+          <Button variant="contained" onClick={handleSubmit} startIcon={<Save />} sx={{ bgcolor: '#293D91' }}>
+            Add Car
           </Button>
         </Box>
       </Paper>

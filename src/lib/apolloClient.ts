@@ -6,10 +6,15 @@ import { getCookie } from 'cookies-next';
 import { getSession } from 'next-auth/react';
 
 const errorLink = onError(({ graphQLErrors, networkError }) => {
-  if (graphQLErrors) {
-    graphQLErrors.forEach(({ message, path }) =>
-      console.log(`[GraphQL error]: Message: ${message}, Path: ${path}`)
-    );
+  if (process.env.NODE_ENV === 'development') {
+    if (graphQLErrors) {
+      graphQLErrors.forEach(({ message, path }) => {
+        console.error('❌ GraphQL Error:', message, 'at', path);
+      });
+    }
+    if (networkError) {
+      console.error('❌ Network Error:', networkError);
+    }
   }
 });
 
@@ -25,17 +30,15 @@ const authLink = setContext(async (_, { headers }) => {
   try {
     const session: any = await getSession();
     token = session?.accessToken;
-    console.log('🔑 Apollo Auth - Session token:', token ? 'Found' : 'Not found');
   } catch (error) {
-    console.error('❌ Apollo Auth - Error getting session:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ Apollo Auth - Error getting session:', error);
+    }
   }
 
   if (!token) {
     token = getCookie('token');
-    console.log('🍪 Apollo Auth - Cookie token:', token ? 'Found' : 'Not found');
   }
-
-  console.log('🔐 Apollo Auth - Final token for request:', token ? `Bearer ${token.substring(0, 20)}...` : 'None');
 
   return {
     headers: {

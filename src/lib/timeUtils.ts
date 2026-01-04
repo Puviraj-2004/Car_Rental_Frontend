@@ -81,23 +81,3 @@ export function formatRemainingTime(minutes: number): string {
   }
 }
 
-/**
- * Get current UTC time as ISO string (for debugging)
- */
-export function getCurrentUtcTime(): string {
-  return new Date().toISOString();
-}
-
-/**
- * Debug utility to log UTC vs Local time conversion
- * @param utcISOString - UTC timestamp to debug
- */
-export function debugTimeConversion(utcISOString: string): void {
-  console.log('🕒 Time Debug:', {
-    utcTime: utcISOString,
-    localTime: formatUtcToLocalTime(utcISOString),
-    userTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    currentUtc: getCurrentUtcTime(),
-    remainingMinutes: getRemainingMinutes(utcISOString)
-  });
-}

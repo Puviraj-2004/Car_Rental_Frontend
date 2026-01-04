@@ -14,9 +14,10 @@ export default function HomePage() {
   return (
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
       <HeroSection />
+      <FeaturedCars />
       <TrustBadges />
       <AIFeature />
-      <FeaturedCars />
+      
       
       {/* Call to Action Section */}
       <Box sx={{ py: 10, textAlign: 'center', bgcolor: 'white' }}>
