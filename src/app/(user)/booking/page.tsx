@@ -52,23 +52,34 @@ function BookingContent() {
   const carId = searchParams.get('carId');
   const bookingId = searchParams.get('bookingId') || null;
 
-  const getInitialDate = (key: string) => {
-    if (typeof window === 'undefined') return '';
-    const val = new URLSearchParams(window.location.search).get(key);
-    return (val && val.includes('T')) ? val.split('T')[0] : '';
-  };
+  // Generate Default Dates as Fallback
+  const defaultDates = generateDefaultBookingDates();
 
-  const getInitialTime = (key: string) => {
-    if (typeof window === 'undefined') return '';
-    const val = new URLSearchParams(window.location.search).get(key);
-    return (val && val.includes('T')) ? val.split('T')[1].substring(0, 5) : '';
-  };
+  // State: Initialize with Defaults to avoid "null" errors
+  const [startDate, setStartDate] = useState(defaultDates.start.date);
+  const [startTime, setStartTime] = useState('10:00');
+  const [endDate, setEndDate] = useState(defaultDates.end.date);
+  const [endTime, setEndTime] = useState('10:00');
 
-  const [startDate, setStartDate] = useState(() => getInitialDate('start'));
-  const [startTime, setStartTime] = useState(() => getInitialTime('start'));
-  const [endDate, setEndDate] = useState(() => getInitialDate('end'));
-  const [endTime, setEndTime] = useState(() => getInitialTime('end'));
+  // --- 🔥 CORE FIX: FORCE SYNC DATES FROM URL ON MOUNT ---
+  useEffect(() => {
+    const urlStart = searchParams.get('start'); // Format: YYYY-MM-DDTHH:mm
+    const urlEnd = searchParams.get('end');
 
+    if (urlStart && urlStart.includes('T')) {
+      const [d, t] = urlStart.split('T');
+      setStartDate(d);
+      setStartTime(t ? t.substring(0, 5) : '10:00');
+    }
+    
+    if (urlEnd && urlEnd.includes('T')) {
+      const [d, t] = urlEnd.split('T');
+      setEndDate(d);
+      setEndTime(t ? t.substring(0, 5) : '10:00');
+    }
+  }, [searchParams]);
+
+  // Derived Full ISO Strings for Backend
   const startDateTime = startDate && startTime ? `${startDate}T${startTime}:00` : '';
   const endDateTime = endDate && endTime ? `${endDate}T${endTime}:00` : '';
 
@@ -87,6 +98,7 @@ function BookingContent() {
   const { data: userData } = useQuery(GET_ME_QUERY, { skip: !session });
   const { data: platformData } = useQuery(GET_PLATFORM_SETTINGS_QUERY);
 
+  // Get Booking Data (If editing existing booking)
   const { data: bookingData, loading: bookingLoading } = useQuery(GET_BOOKING_QUERY, {
     variables: bookingId ? { id: bookingId } : undefined,
     skip: !bookingId,
@@ -95,12 +107,14 @@ function BookingContent() {
 
   const carQueryId = carId || bookingData?.booking?.car?.id;
 
+  // Get Car Details
   const { data: carData, loading: carLoading } = useQuery(GET_CAR_QUERY, {
     variables: carQueryId ? { id: carQueryId } : undefined,
     skip: !carQueryId,
     fetchPolicy: 'cache-and-network'
   });
 
+  // Real-time Availability Check
   const { data: availabilityData, loading: checkingAvailability } = useQuery(CHECK_CAR_AVAILABILITY_QUERY, {
     variables: {
       carId: carQueryId,
@@ -131,6 +145,7 @@ function BookingContent() {
     }
   }, [availabilityData]);
 
+  // Sync from DB Booking (Only if NO URL params exist)
   useEffect(() => {
     if (bookingData?.booking) {
       const booking = bookingData.booking;
@@ -139,8 +154,9 @@ function BookingContent() {
         setEmailVerificationPopup(true);
       }
       
-      const rawStart = searchParams.get('start');
-      if (!rawStart && booking.startDate && booking.endDate) {
+      const urlStart = searchParams.get('start');
+      // If URL params are missing, revert to what's in the DB
+      if (!urlStart && booking.startDate && booking.endDate) {
          try {
             const sDate = new Date(booking.startDate);
             const eDate = new Date(booking.endDate);
@@ -156,22 +172,16 @@ function BookingContent() {
     }
   }, [bookingData, searchParams]);
 
-  // 🔥 FIXED TIMER LOGIC: Prevents NaN Error
+  // Timer Logic
   useEffect(() => {
-    // Only run if popup is open and we have a valid expiry date
     if (!emailVerificationPopup || !confirmedBookingData?.verification?.expiresAt) {
-      setVerificationTimer('60:00'); // Default fallback
+      setVerificationTimer('60:00');
       return;
     }
-
-    const expiryString = confirmedBookingData.verification.expiresAt;
     
-    // Test if date is valid
+    const expiryString = confirmedBookingData.verification.expiresAt;
     const testDate = new Date(expiryString);
-    if (isNaN(testDate.getTime())) {
-      setVerificationTimer('60:00'); // Safety fallback
-      return;
-    }
+    if (isNaN(testDate.getTime())) return;
 
     const interval = setInterval(() => {
       try {
@@ -187,14 +197,8 @@ function BookingContent() {
 
         const minutes = Math.floor(diff / 60000);
         const seconds = Math.floor((diff % 60000) / 1000);
-        
-        // Pad with zeros for nice display
-        const minStr = minutes < 10 ? `0${minutes}` : minutes;
-        const secStr = seconds < 10 ? `0${seconds}` : seconds;
-        
-        setVerificationTimer(`${minStr}:${secStr}`);
+        setVerificationTimer(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
       } catch (e) { 
-        console.error("Timer Error", e);
         setVerificationTimer('ERROR'); 
       }
     }, 1000);
@@ -202,6 +206,7 @@ function BookingContent() {
     return () => clearInterval(interval);
   }, [emailVerificationPopup, confirmedBookingData]);
 
+  // Price Calculation
   const priceDetails = useMemo(() => {
     if (!carData?.car || !hasDates || !platformData?.platformSettings) return null;
     
@@ -231,8 +236,7 @@ function BookingContent() {
     };
   }, [carData, startDateTime, endDateTime, platformData, userData, hasDates]);
 
-  // --- 4. HANDLERS ---
-
+  // Handlers
   const handleConfirmAction = async () => {
     try {
       let bookingIdToUse = bookingId;
@@ -261,7 +265,6 @@ function BookingContent() {
         if (confirmData?.confirmReservation?.id) {
           setConfirmedBookingData(confirmData.confirmReservation);
           setEmailVerificationPopup(true);
-          // Set initial timer immediately to avoid delay
           setVerificationTimer('59:59'); 
         }
       }
@@ -293,7 +296,7 @@ function BookingContent() {
 
   return (
     <Box sx={{ bgcolor: '#F8FAFC', minHeight: '100vh', pb: 12 }}>
-      <Container maxWidth="xl" sx={{ pt: 4 }}>
+      <Container maxWidth="xl">
         
         {/* HEADER */}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
@@ -473,7 +476,6 @@ function BookingContent() {
                              <Divider sx={{ borderStyle: 'dashed', mb: 2 }} />
                              <Box display="flex" justifyContent="space-between" alignItems="center">
                                 <Typography variant="h6" fontWeight={800} color="#0F172A">€{c.pricePerDay}<Typography component="span" variant="body2" color="text.secondary" fontWeight={500}>/day</Typography></Typography>
-                                <Typography variant="button" fontWeight={800} color="#0F172A">Select</Typography>
                              </Box>
                           </Box>
                         </CardActionArea>
@@ -490,67 +492,158 @@ function BookingContent() {
         </DialogContent>
       </Dialog>
 
-      {/* 2. VERIFICATION MODAL (NO CLOSE BUTTON) */}
+      {/* 2. VERIFICATION MODAL (FIXED TIMER & NO CLOSE BUTTON) */}
       <Dialog 
         open={emailVerificationPopup} 
         maxWidth="md" 
         fullWidth 
-        PaperProps={{ sx: { borderRadius: 4, overflow: 'hidden' } }}
-        // Prevent closing by clicking outside
-        onClose={() => {}} 
+        PaperProps={{ 
+          sx: { 
+            borderRadius: 6, 
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+          } 
+        }}
+        // Prevent closing by clicking outside or pressing Escape
+        onClose={(event, reason) => {
+          if (reason !== 'backdropClick' && reason !== 'escapeKeyDown') {
+            setEmailVerificationPopup(false);
+          }
+        }}
       >
-        {/* Removed Close Icon Box Here */}
         <Grid container>
-          <Grid item xs={12} md={5} sx={{ bgcolor: '#7C3AED', p: 5, display: 'flex', flexDirection: 'column', justifyContent: 'center', color: 'white' }}>
-             <Box sx={{ width: 60, height: 60, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3 }}>
-               <CheckCircle sx={{ fontSize: 32 }} />
+          {/* Left Side: Information & Timer */}
+          <Grid item xs={12} md={5} sx={{ 
+            bgcolor: '#7C3AED', 
+            p: 5, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            justifyContent: 'center', 
+            color: 'white',
+            position: 'relative'
+          }}>
+             <Box sx={{ 
+               width: 64, 
+               height: 64, 
+               borderRadius: '50%', 
+               bgcolor: 'rgba(255,255,255,0.2)', 
+               display: 'flex', 
+               alignItems: 'center', 
+               justifyContent: 'center', 
+               mb: 3 
+             }}>
+               <CheckCircle sx={{ fontSize: 40, color: 'white' }} />
              </Box>
-             <Typography variant="h4" fontWeight={900} gutterBottom>Booking Saved!</Typography>
-             <Typography sx={{ opacity: 0.9, lineHeight: 1.6, mb: 4 }}>
-               Complete verification within the time limit to secure your car.
+             
+             <Typography variant="h4" fontWeight={900} gutterBottom sx={{ letterSpacing: '-0.02em' }}>
+               Booking Saved!
+             </Typography>
+             <Typography sx={{ opacity: 0.9, lineHeight: 1.6, fontSize: '1.05rem', mb: 5 }}>
+               Your reservation is held. Complete the verification process now to fully secure your vehicle.
              </Typography>
              
-             <Box sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 3, border: '1px solid rgba(255,255,255,0.2)' }}>
-                <Typography variant="caption" fontWeight={700} sx={{ opacity: 0.8, letterSpacing: 1, display:'flex', alignItems:'center', gap:1 }}>
-                   <AccessAlarm fontSize="small"/> TIME REMAINING
-                </Typography>
-                <Typography variant="h3" fontWeight={800} sx={{ fontFamily: 'monospace', mt:1 }}>
-                   {verificationTimer}
-                </Typography>
-             </Box>
+            {/* Warning Footer */}
+             <Alert 
+               severity="warning" 
+               icon={<WarningAmber sx={{ color: '#B45309' }} />}
+               sx={{ 
+                 mt: 5, 
+                 borderRadius: 4, 
+                 textAlign: 'left', 
+                 bgcolor: '#FFFBEB', 
+                 border: '1px solid #FEF3C7',
+                 '& .MuiAlert-message': { color: '#92400E', fontWeight: 500, fontSize: '0.85rem' }
+               }}
+             >
+                Important: If verification is not started within 1 hour, your booking will be automatically cancelled to release the vehicle.
+             </Alert>
           </Grid>
 
-          <Grid item xs={12} md={7} sx={{ p: 5, textAlign: 'center' }}>
-             {confirmedBookingData?.verification?.token ? (
-               <Box sx={{ p: 2, border: '2px solid #F1F5F9', borderRadius: 3, display: 'inline-block', mb: 3 }}>
-                 <QRCode value={`${window.location.origin}/verification/${confirmedBookingData.verification.token}`} size={160} />
-               </Box>
-             ) : <CircularProgress />}
+          {/* Right Side: QR & Actions */}
+          <Grid item xs={12} md={7} sx={{ p: 6, textAlign: 'center', bgcolor: 'white' }}>
              
-             <Typography variant="body1" fontWeight={600} color="#0F172A" mb={3}>Scan QR to verify Identity</Typography>
+             {/* QR Code Section */}
+             <Box sx={{ mb: 4 }}>
+               {confirmedBookingData?.verification?.token ? (
+                 <Box sx={{ 
+                   p: 2, 
+                   bgcolor: 'white',
+                   borderRadius: 4,
+                   display: 'inline-block',
+                   border: '2px solid #F1F5F9',
+                   boxShadow: '0 10px 25px rgba(0,0,0,0.05)'
+                 }}>
+                   <QRCode 
+                     value={`${window.location.origin}/verification/${confirmedBookingData.verification.token}`} 
+                     size={180} 
+                     level="H"
+                   />
+                 </Box>
+               ) : (
+                 <Box sx={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                   <CircularProgress size={40} sx={{ color: '#7C3AED' }} />
+                 </Box>
+               )}
+               <Typography variant="body1" fontWeight={700} color="#0F172A" sx={{ mt: 3 }}>
+                 Scan QR to verify Identity
+               </Typography>
+             </Box>
              
-             <Button 
-                fullWidth 
-                variant="contained" 
-                size="large"
-                startIcon={<ContentCopy />} 
-                onClick={handleCopyLink}
-                sx={{ py: 1.5, borderRadius: 3, bgcolor: '#0F172A', fontWeight: 700 }}
-             >
-                {copySuccess ? 'Link Copied!' : 'Copy Verification Link'}
-             </Button>
+             {/* Action Buttons */}
+             <Stack spacing={2} sx={{ width: '100%', maxWidth: 320, mx: 'auto' }}>
+                <Button 
+                    fullWidth 
+                    variant="contained" 
+                    size="large"
+                    startIcon={<ContentCopy />} 
+                    onClick={handleCopyLink}
+                    sx={{ 
+                      py: 1.8, 
+                      borderRadius: 10, 
+                      bgcolor: '#0F172A', 
+                      color: 'white',
+                      fontWeight: 800,
+                      textTransform: 'none',
+                      fontSize: '1rem',
+                      '&:hover': { bgcolor: '#1E293B' }
+                    }}
+                >
+                    {copySuccess ? 'Link Copied!' : 'Copy Verification Link'}
+                </Button>
 
-             <Button 
-                fullWidth 
-                variant="outlined" 
-                onClick={() => router.push('/bookingRecords')}
-                sx={{ mt: 2, py: 1.5, borderRadius: 3, borderColor: '#E2E8F0', color: '#64748B', fontWeight: 600 }}
-             >
-                Go to Booking Records
-             </Button>
+                <Button 
+                    fullWidth 
+                    variant="outlined" 
+                    onClick={() => router.push('/bookingRecords')}
+                    sx={{ 
+                      py: 1.8, 
+                      borderRadius: 10, 
+                      borderColor: '#E2E8F0', 
+                      color: '#64748B', 
+                      fontWeight: 700,
+                      textTransform: 'none',
+                      fontSize: '1rem',
+                      '&:hover': { borderColor: '#CBD5E1', bgcolor: '#F8FAFC' }
+                    }}
+                >
+                    Go to Booking Records
+                </Button>
+             </Stack>
              
-             <Alert severity="warning" icon={<WarningAmber fontSize="small"/>} sx={{ mt: 4, borderRadius: 2, textAlign: 'left', fontSize: '0.85rem' }}>
-                Booking will be cancelled if verification is not started within 1 hour.
+             {/* Warning Footer */}
+             <Alert 
+               severity="warning" 
+               icon={<WarningAmber sx={{ color: '#B45309' }} />}
+               sx={{ 
+                 mt: 5, 
+                 borderRadius: 4, 
+                 textAlign: 'left', 
+                 bgcolor: '#FFFBEB', 
+                 border: '1px solid #FEF3C7',
+                 '& .MuiAlert-message': { color: '#92400E', fontWeight: 500, fontSize: '0.85rem' }
+               }}
+             >
+                Important: If verification is not started within 1 hour, your booking will be automatically cancelled to release the vehicle.
              </Alert>
           </Grid>
         </Grid>

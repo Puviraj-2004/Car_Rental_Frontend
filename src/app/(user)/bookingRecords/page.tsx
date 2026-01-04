@@ -4,36 +4,40 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
-  Box, Container, Typography, Card, Stack, Chip, Button,
-  Divider, Skeleton, IconButton, Dialog, DialogContent,
-  Grid, Paper, Fade, Alert, TextField,DialogTitle, Link
+  Box, Container, Typography, Stack, Chip, Button,
+  Table, TableBody, TableCell, TableContainer,
+  TableHead, TableRow, Paper, 
+  CircularProgress, Snackbar, Alert, Dialog, DialogContent, 
+  DialogTitle, Divider, Grid, TextField, IconButton
 } from '@mui/material';
 import {
-  AccessTime as TimerIcon,
-  CheckCircle as SuccessIcon,
-  Cancel as CancelIcon,
-  Error as ErrorIcon,
-  Info as InfoIcon,
-  ArrowForwardIos as ArrowIcon,
+  ContentCopy as CopyIcon,
   Close as CloseIcon,
-  DirectionsCar as CarIcon,
+  OpenInNew as OpenIcon,
+  Edit as EditIcon,
+  DeleteForever as CancelIcon,
   CalendarMonth as DateIcon,
-  QrCode2 as QrIcon,
-  Link as LinkIcon,
-  Edit as EditIcon
+  ChevronRight as ChevronRightIcon
 } from '@mui/icons-material';
 import QRCode from 'react-qr-code';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { GET_MY_BOOKINGS_QUERY } from '@/lib/graphql/queries';
-import { RESEND_VERIFICATION_LINK_MUTATION, CANCEL_BOOKING_MUTATION } from '@/lib/graphql/mutations';
-import { format } from 'date-fns';
-import { formatUtcToLocalTime, getExpirationMessage, getRemainingMinutes, formatRemainingTime } from '@/lib/timeUtils';
-import { formatDateForDisplay, formatTimeForDisplay, formatDateTimeForDisplay } from '@/lib/dateUtils';
+import { CANCEL_BOOKING_MUTATION } from '@/lib/graphql/mutations';
+
+// --- 🛠️ HELPER: Safe Date Formatter ---
+const formatSecureDate = (dateStr: string) => {
+  if (!dateStr) return 'N/A';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return 'Invalid Date';
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric'
+  }).format(d);
+};
 
 export default function BookingRecordsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const client = useApolloClient();
 
   const { data, loading, error, refetch } = useQuery(GET_MY_BOOKINGS_QUERY, {
@@ -41,903 +45,237 @@ export default function BookingRecordsPage() {
     skip: status !== 'authenticated'
   });
 
-  // Filter out DRAFT bookings for display
-  const filteredBookings = data?.myBookings?.filter((booking: any) => booking.status !== 'DRAFT') || [];
+  const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [copySnack, setCopySnack] = useState(false);
 
-  // Auto-refetch if refresh parameter is present
+  const [cancelBooking, { loading: cancelLoading }] = useMutation(CANCEL_BOOKING_MUTATION);
+
+  const bookings = data?.myBookings?.filter((b: any) => b.status !== 'DRAFT') || [];
+
   useEffect(() => {
     if (searchParams.get('refresh')) {
-      // Invalidate cache first
       client.cache.evict({ fieldName: 'myBookings' });
       client.cache.gc();
-
       refetch();
-      // Clean up URL
       router.replace('/bookingRecords');
     }
   }, [searchParams, refetch, router, client]);
 
-  const [selectedBooking, setSelectedBooking] = useState<any>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [bookingToCancel, setBookingToCancel] = useState<any>(null);
-
-  const [cancelBooking, { loading: cancelLoading }] = useMutation(CANCEL_BOOKING_MUTATION);
-
-  const handleCancelBooking = async (bookingId: string) => {
-    setBookingToCancel(data?.myBookings?.find((b: any) => b.id === bookingId));
-    setCancelDialogOpen(true);
-  };
-
-  const confirmCancelBooking = async () => {
-    if (!bookingToCancel) return;
-
-    try {
-      await cancelBooking({
-        variables: { id: bookingToCancel.id }
-      });
-
-      setCancelDialogOpen(false);
-      setBookingToCancel(null);
-      refetch(); // Refresh the bookings list
-    } catch (error: any) {
-      alert('Failed to cancel booking: ' + error.message);
-    }
-  };
-
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (status === 'loading') return;
-    if (status === 'unauthenticated') {
-      router.push('/login?redirect=/bookingRecords');
-    }
-  }, [status, router]);
-
-  // Invalidate cache when component mounts (for fresh data)
-  useEffect(() => {
-    if (status === 'authenticated') {
-      client.cache.evict({ fieldName: 'myBookings' });
-      client.cache.gc();
-    }
-  }, [status, client]);
-
-  const handleOpenDetails = (booking: any) => {
+  const handleRowClick = (booking: any) => {
     setSelectedBooking(booking);
     setDetailsOpen(true);
   };
 
-  if (status === 'loading') {
-    return (
-      <Box sx={{ minHeight: '80vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-        <Typography>Checking authentication...</Typography>
-      </Box>
-    );
-  }
+  const handleCancelBooking = async (id: string) => {
+    if (window.confirm("Are you sure you want to cancel this booking?")) {
+      try {
+        await cancelBooking({ variables: { id } });
+        setDetailsOpen(false);
+        refetch();
+      } catch (e: any) {
+        alert(e.message);
+      }
+    }
+  };
 
-  if (error) return <Alert severity="error">Failed to load bookings</Alert>;
+  const copyLink = (token: string) => {
+    const link = `${window.location.origin}/verification/${token}`;
+    navigator.clipboard.writeText(link);
+    setCopySnack(true);
+  };
+
+  const getStatusStyles = (status: string) => {
+    switch (status) {
+      case 'CONFIRMED': return { bg: '#ECFDF5', color: '#047857', border: '#A7F3D0' };
+      case 'CANCELLED': return { bg: '#FEF2F2', color: '#B91C1C', border: '#FECACA' };
+      case 'PENDING': return { bg: '#FFFBEB', color: '#B45309', border: '#FDE68A' };
+      case 'VERIFIED': return { bg: '#EFF6FF', color: '#1D4ED8', border: '#BFDBFE' };
+      default: return { bg: '#F3F4F6', color: '#6B7280', border: '#E5E7EB' };
+    }
+  };
+
+  if (loading) return <Box sx={{ minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}><CircularProgress color="inherit" /></Box>;
+  if (error) return <Alert severity="error">Error loading bookings</Alert>;
 
   return (
-    <Box sx={{ bgcolor: '#F8FAFC', minHeight: '100vh', pb: 5, pt: { xs: 10, md: 12 } }}>
-      <Container maxWidth="md">
-        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3} px={1}>
-          <Typography variant="h5" fontWeight={900}>My Bookings</Typography>
-          <Button size="small" variant="text" onClick={() => refetch()} sx={{ fontWeight: 700 }}>Refresh</Button>
-        </Stack>
+    <Box sx={{ bgcolor: '#F8FAFC', minHeight: '100vh',  pb: 10 }}>
+      <Container maxWidth="xl">
+        
+        <Box sx={{ mb: 4, px: { xs: 1, md: 0 } }}>
+          <Typography variant="h4" fontWeight={900} color="#0F172A" sx={{ fontSize: { xs: '1.75rem', md: '2.25rem' } }}>Booking History</Typography>
+          <Typography variant="body2" color="text.secondary">Manage your upcoming and past trips</Typography>
+        </Box>
 
-        {loading ? (
+        {/* 💻 DESKTOP VIEW (Table) */}
+        <Box sx={{ display: { xs: 'none', md: 'block' } }}>
+          <Paper elevation={0} sx={{ borderRadius: 4, border: '1px solid #E2E8F0', overflow: 'hidden' }}>
+            <TableContainer>
+              <Table>
+                <TableHead sx={{ bgcolor: '#F8FAFC' }}>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700, color: '#64748B' }}>VEHICLE</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#64748B' }}>BOOKING ID</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#64748B' }}>PRICE</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#64748B' }}>PICKUP DATE</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#64748B' }}>STATUS</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {bookings.map((booking: any) => {
+                    const style = getStatusStyles(booking.status);
+                    return (
+                      <TableRow key={booking.id} hover onClick={() => handleRowClick(booking)} sx={{ cursor: 'pointer' }}>
+                        <TableCell>
+                          <Stack direction="row" spacing={2} alignItems="center">
+                            <Box sx={{ width: 64, height: 40, bgcolor: '#F1F5F9', borderRadius: 1, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                               <img src={booking.car?.images?.[0]?.url} alt="car" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                            </Box>
+                            <Box>
+                              <Typography variant="body2" fontWeight={800}>{booking.car?.brand?.name} {booking.car?.model?.name}</Typography>
+                              <Typography variant="caption" color="text.secondary">{booking.car?.plateNumber}</Typography>
+                            </Box>
+                          </Stack>
+                        </TableCell>
+                        <TableCell><Typography variant="body2" fontWeight={600}>#{booking.id.slice(-6).toUpperCase()}</Typography></TableCell>
+                        <TableCell><Typography variant="body2" fontWeight={800}>€{booking.totalPrice?.toFixed(2)}</Typography></TableCell>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={600}>{formatSecureDate(booking.startDate)}</Typography>
+                          <Typography variant="caption" color="text.secondary">{booking.pickupTime}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip label={booking.status} size="small" sx={{ fontWeight: 800, fontSize: '0.65rem', bgcolor: style.bg, color: style.color, border: `1px solid ${style.border}` }} />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </Box>
+
+        {/* 📱 MOBILE VIEW (Cards) */}
+        <Box sx={{ display: { xs: 'block', md: 'none' } }}>
           <Stack spacing={2}>
-            {[1, 2, 3].map((i) => <Skeleton key={i} variant="rectangular" height={120} sx={{ borderRadius: 4 }} />)}
+            {bookings.length === 0 ? (
+              <Typography align="center" color="text.secondary" sx={{ py: 4 }}>No records found</Typography>
+            ) : (
+              bookings.map((booking: any) => {
+                const style = getStatusStyles(booking.status);
+                return (
+                  <Paper 
+                    key={booking.id} 
+                    onClick={() => handleRowClick(booking)}
+                    sx={{ p: 2, borderRadius: 3, border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
+                  >
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <Box sx={{ width: 80, height: 50, bgcolor: '#F1F5F9', borderRadius: 2, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                         <img src={booking.car?.images?.[0]?.url} alt="car" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                      </Box>
+                      <Box sx={{ flexGrow: 1 }}>
+                        <Typography variant="subtitle2" fontWeight={800}>{booking.car?.brand?.name} {booking.car?.model?.name}</Typography>
+                        <Typography variant="caption" color="text.secondary" display="block">ID: #{booking.id.slice(-6).toUpperCase()}</Typography>
+                        <Typography variant="caption" fontWeight={700} color="primary" display="block">€{booking.totalPrice?.toFixed(2)}</Typography>
+                      </Box>
+                      <ChevronRightIcon sx={{ color: '#CBD5E1' }} />
+                    </Stack>
+                    <Divider sx={{ my: 1.5, borderStyle: 'dashed' }} />
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Box>
+                         <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                           <DateIcon sx={{ fontSize: 14 }} /> {formatSecureDate(booking.startDate)}
+                         </Typography>
+                      </Box>
+                      <Chip label={booking.status} size="small" sx={{ fontWeight: 800, fontSize: '0.6rem', bgcolor: style.bg, color: style.color, height: 20 }} />
+                    </Stack>
+                  </Paper>
+                );
+              })
+            )}
           </Stack>
-        ) : filteredBookings.length === 0 ? (
-          <Box textAlign="center" py={10}>
-            <CarIcon sx={{ fontSize: 60, color: 'text.disabled', mb: 2 }} />
-            <Typography variant="h6" fontWeight={700}>No confirmed bookings yet</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Your draft bookings will appear here once confirmed.
-            </Typography>
-            <Button variant="contained" sx={{ mt: 2, borderRadius: 2 }} onClick={() => window.location.href = '/cars'}>Explore Cars</Button>
-          </Box>
-        ) : (
-          <Stack spacing={2}>
-            {filteredBookings.map((booking: any) => (
-              <BookingCard 
-                key={booking.id} 
-                booking={booking} 
-                onViewDetails={() => handleOpenDetails(booking)} 
-              />
-            ))}
-          </Stack>
-        )}
+        </Box>
+
       </Container>
 
-      {/* 🚀 DETAILS MODAL */}
-      <BookingDetailsModal 
-        open={detailsOpen} 
-        onClose={() => setDetailsOpen(false)} 
-        booking={selectedBooking} 
-        data={data}
-        setBookingToCancel={setBookingToCancel}
-        setCancelDialogOpen={setCancelDialogOpen}
-        onCancelBooking={handleCancelBooking}
-      />
+      {/* 🚀 DYNAMIC DETAILS MODAL */}
+      <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: { xs: 0, sm: 5 }, m: { xs: 0, sm: 2 } } }}>
+        {selectedBooking && (
+          <>
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: { xs: 2, md: 3 } }}>
+              <Typography variant="h6" fontWeight={900} component="span">Booking Details</Typography>
+              <IconButton onClick={() => setDetailsOpen(false)}><CloseIcon /></IconButton>
+            </DialogTitle>
+            <Divider />
+            <DialogContent sx={{ p: { xs: 2, md: 4 }, bgcolor: '#F8FAFC' }}>
+              
+              {selectedBooking.status === 'PENDING' && (
+                <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 4, mb: 4, border: '2px solid #7C3AED', bgcolor: '#FFFFFF' }}>
+                  <Typography variant="subtitle2" fontWeight={900} color="#7C3AED" gutterBottom>Verification Required</Typography>
+                  <Grid container spacing={3} alignItems="center">
+                    <Grid item xs={12} sm={4} textAlign="center">
+                       <Box p={1} bgcolor="white" border="1px solid #E2E8F0" borderRadius={2} display="inline-block">
+                          <QRCode value={`${window.location.origin}/verification/${selectedBooking.verification?.token}`} size={120} />
+                       </Box>
+                    </Grid>
+                    <Grid item xs={12} sm={8}>
+                      <Stack spacing={2}>
+                        <TextField fullWidth size="small" value={`${window.location.origin}/verification/${selectedBooking.verification?.token}`} InputProps={{ readOnly: true, endAdornment: <IconButton onClick={() => copyLink(selectedBooking.verification?.token)}><CopyIcon fontSize="small"/></IconButton> }} />
+                        <Button fullWidth variant="contained" startIcon={<OpenIcon />} onClick={() => window.open(`${window.location.origin}/verification/${selectedBooking.verification?.token}`, '_blank')} sx={{ bgcolor: '#7C3AED', fontWeight: 700 }}>Open Link</Button>
+                        <Stack direction="row" spacing={1}>
+                          <Button fullWidth variant="outlined" size="small" startIcon={<EditIcon />} onClick={() => router.push(`/booking?bookingId=${selectedBooking.id}`)}>Edit</Button>
+                          <Button fullWidth variant="outlined" size="small" color="error" startIcon={<CancelIcon />} onClick={() => handleCancelBooking(selectedBooking.id)}>Cancel</Button>
+                        </Stack>
+                      </Stack>
+                    </Grid>
+                  </Grid>
+                </Paper>
+              )}
 
-      {/* Cancel Booking Confirmation Dialog */}
-      <Dialog
-        open={cancelDialogOpen}
-        onClose={() => setCancelDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        sx={{
-          '& .MuiDialog-paper': {
-            borderRadius: 3,
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          },
-          '@keyframes spin': {
-            '0%': { transform: 'rotate(0deg)' },
-            '100%': { transform: 'rotate(360deg)' },
-          }
-        }}
-      >
-        <DialogContent sx={{ p: 0 }}>
-          <Box sx={{ p: 4 }}>
-            {/* Header */}
-            <Box sx={{ textAlign: 'center', mb: 3 }}>
-              <Box sx={{
-                width: 64,
-                height: 64,
-                borderRadius: '50%',
-                bgcolor: '#FEE2E2',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                mx: 'auto',
-                mb: 2
-              }}>
-                <CancelIcon sx={{ fontSize: 32, color: '#DC2626' }} />
-              </Box>
-              <Typography variant="h5" fontWeight={700} color="#DC2626" sx={{ mb: 1 }}>
-                Cancel Booking
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                This action cannot be undone
-              </Typography>
-            </Box>
+              <Grid container spacing={3}>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="caption" fontWeight={800} color="text.secondary">VEHICLE</Typography>
+                  <Stack direction="row" spacing={2} mt={1}>
+                    <Box sx={{ width: 100, height: 70, bgcolor: '#F1F5F9', borderRadius: 2, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                       <img src={selectedBooking.car?.images?.[0]?.url} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    </Box>
+                    <Box>
+                      <Typography variant="body2" fontWeight={800}>{selectedBooking.car?.brand?.name} {selectedBooking.car?.model?.name}</Typography>
+                      <Typography variant="caption" color="text.secondary" display="block">{selectedBooking.car?.plateNumber}</Typography>
+                    </Box>
+                  </Stack>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="caption" fontWeight={800} color="text.secondary">SCHEDULE</Typography>
+                  <Stack spacing={0.5} mt={1}>
+                    <Typography variant="body2" fontWeight={600}>{formatSecureDate(selectedBooking.startDate)} to {formatSecureDate(selectedBooking.endDate)}</Typography>
+                    <Typography variant="caption" color="text.secondary">{selectedBooking.pickupTime} - {selectedBooking.returnTime}</Typography>
+                  </Stack>
+                </Grid>
+              </Grid>
 
-            {/* Warning Message */}
-            <Typography variant="body1" sx={{ mb: 3, textAlign: 'center', color: '#374151' }}>
-              Are you sure you want to cancel this booking? You will lose any payments made and the vehicle reservation.
-            </Typography>
+              <Divider sx={{ my: 3 }} />
 
-            {/* Booking Details */}
-            {bookingToCancel && (
-              <Box sx={{
-                p: 3,
-                bgcolor: '#F8FAFC',
-                borderRadius: 2,
-                border: '1px solid #E2E8F0',
-                mb: 3
-              }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                  <Box sx={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 2,
-                    bgcolor: '#2563EB',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <Typography variant="body1" fontWeight={700} color="white">
-                      {bookingToCancel.car?.brand?.name?.charAt(0)}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="subtitle1" fontWeight={600}>
-                      {bookingToCancel.car?.brand?.name} {bookingToCancel.car?.model?.name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Booking #{bookingToCancel.id.slice(-6).toUpperCase()}
-                    </Typography>
-                  </Box>
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Box>
+                   <Typography variant="caption" fontWeight={800} color="text.secondary">TOTAL AMOUNT</Typography>
+                   <Typography variant="h5" fontWeight={900} color="primary">€{selectedBooking.totalPrice?.toFixed(2)}</Typography>
                 </Box>
-
-                <Stack spacing={1}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box>
-                      <Typography variant="body2" color="text.secondary">
-                        Pickup
-                      </Typography>
-                      <Typography variant="body2" fontWeight={600}>
-                        {formatDateForDisplay(bookingToCancel.startDate)}
-                        {bookingToCancel.pickupTime && (
-                          <span> at {formatTimeForDisplay(bookingToCancel.pickupTime)}</span>
-                        )}
-                      </Typography>
-                    </Box>
-                    <Typography variant="h6" fontWeight={700} color="#DC2626">
-                      €{bookingToCancel.totalPrice?.toFixed(2)}
-                    </Typography>
-                  </Box>
-
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box>
-                      <Typography variant="body2" color="text.secondary">
-                        Return
-                      </Typography>
-                      <Typography variant="body2" fontWeight={600}>
-                        {formatDateForDisplay(bookingToCancel.endDate)}
-                        {bookingToCancel.returnTime && (
-                          <span> at {formatTimeForDisplay(bookingToCancel.returnTime)}</span>
-                        )}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Stack>
+                <Chip label={selectedBooking.status} size="small" sx={{ fontWeight: 900 }} />
               </Box>
-            )}
 
-            {/* Action Buttons */}
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <Button
-                onClick={() => setCancelDialogOpen(false)}
-                variant="outlined"
-                fullWidth
-                size="large"
-                sx={{
-                  py: 1.5,
-                  fontWeight: 600,
-                  borderColor: '#D1D5DB',
-                  color: '#6B7280'
-                }}
-              >
-                Keep Booking
-              </Button>
-              <Button
-                onClick={confirmCancelBooking}
-                variant="contained"
-                fullWidth
-                size="large"
-                disabled={cancelLoading}
-                sx={{
-                  py: 1.5,
-                  fontWeight: 600,
-                  bgcolor: '#DC2626',
-                  '&:hover': { bgcolor: '#B91C1C' },
-                  '&:disabled': { bgcolor: '#FCA5A5' }
-                }}
-              >
-                {cancelLoading ? (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box sx={{
-                      width: 16,
-                      height: 16,
-                      border: '2px solid #991B1B',
-                      borderTop: '2px solid transparent',
-                      borderRadius: '50%',
-                      animation: 'spin 1s linear infinite'
-                    }} />
-                    Cancelling...
-                  </Box>
-                ) : (
-                  'Cancel Booking'
-                )}
-              </Button>
-            </Box>
-          </Box>
-        </DialogContent>
+              {selectedBooking.status === 'CANCELLED' && (
+                <Alert severity="error" sx={{ mt: 3, borderRadius: 2 }}>This booking has been cancelled.</Alert>
+              )}
+
+            </DialogContent>
+          </>
+        )}
       </Dialog>
+
+      <Snackbar open={copySnack} autoHideDuration={2000} onClose={() => setCopySnack(false)}>
+        <Alert severity="success">Link copied!</Alert>
+      </Snackbar>
     </Box>
   );
 }
-
-// --- 🏷️ SUB-COMPONENT: BOOKING CARD ---
-const BookingCard = ({ booking, onViewDetails }: any) => {
-  const [timeLeft, setTimeLeft] = useState<string>('');
-
-  // Timer Logic for DRAFT bookings and verification expiry
-  useEffect(() => {
-    if (booking.status !== 'DRAFT' && booking.status !== 'AWAITING_VERIFICATION') return;
-
-    const interval = setInterval(() => {
-      if (booking.status === 'DRAFT') {
-        // Draft bookings expire 1 hour from creation
-        const createdTime = new Date(booking.createdAt).getTime();
-        const expiryTime = createdTime + (60 * 60 * 1000); // 1 hour expiry
-        const now = new Date().getTime();
-        const diff = expiryTime - now;
-
-        if (diff <= 0) {
-          setTimeLeft('Expired');
-          clearInterval(interval);
-        } else {
-          const hours = Math.floor(diff / (1000 * 60 * 60));
-          setTimeLeft(`${hours}h left`);
-        }
-      } else if (booking.status === 'AWAITING_VERIFICATION' && booking.verification?.expiresAt) {
-        // Verification bookings use UTC expiresAt from backend
-        const remainingMinutes = getRemainingMinutes(booking.verification.expiresAt);
-        setTimeLeft(formatRemainingTime(remainingMinutes));
-
-        if (remainingMinutes <= 0) {
-          clearInterval(interval);
-        }
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [booking]);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'CONFIRMED': return { bg: '#DCFCE7', text: '#166534', icon: <SuccessIcon fontSize="small" /> };
-      case 'DRAFT': return { bg: '#FEF9C3', text: '#854D0E', icon: <EditIcon fontSize="small" /> };
-      case 'AWAITING_VERIFICATION': return { bg: '#DBEAFE', text: '#1E40AF', icon: <QrIcon fontSize="small" /> };
-      case 'CANCELLED': return { bg: '#FEE2E2', text: '#991B1B', icon: <CancelIcon fontSize="small" /> };
-      default: return { bg: '#F1F5F9', text: '#475569', icon: <InfoIcon fontSize="small" /> };
-    }
-  };
-
-  const style = getStatusColor(booking.status);
-
-  return (
-    <Fade in timeout={500}>
-      <Card 
-        onClick={onViewDetails}
-        sx={{ 
-          borderRadius: 4, 
-          border: '1px solid #E2E8F0', 
-          boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-          cursor: 'pointer',
-          '&:active': { transform: 'scale(0.98)', transition: '0.1s' }
-        }}
-      >
-        <Box p={2}>
-          <Stack direction="row" spacing={2} alignItems="center">
-            <Box sx={{ width: 60, height: 60, borderRadius: 2, bgcolor: '#F1F5F9', overflow: 'hidden' }}>
-              <img src={booking.car.images[0]?.url} alt="car" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            </Box>
-            <Box flex={1}>
-              <Typography fontWeight={800} fontSize={16}>{booking.car.brand.name} {booking.car.model.name}</Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <DateIcon sx={{ fontSize: 12 }} />
-                {(() => {
-                  try {
-                    const startDateStr = formatDateForDisplay(booking.startDate);
-                    const endDateStr = formatDateForDisplay(booking.endDate);
-
-                    if (startDateStr === 'Invalid Date' || endDateStr === 'Invalid Date') {
-                      return 'Invalid dates';
-                    }
-
-                    // Format with times if available
-                    let displayText = '';
-                    if (startDateStr !== 'Invalid Date' && endDateStr !== 'Invalid Date') {
-                      // Extract just the month and day part for compact display
-                      const startParts = startDateStr.split(' ');
-                      const endParts = endDateStr.split(' ');
-
-                      if (startParts.length >= 2 && endParts.length >= 2) {
-                        displayText = `${startParts[1]} ${startParts[0]}`;
-                        if (booking.pickupTime) {
-                          displayText += ` ${formatTimeForDisplay(booking.pickupTime)}`;
-                        }
-                        displayText += ` - ${endParts[1]} ${endParts[0]}`;
-                        if (booking.returnTime) {
-                          displayText += ` ${formatTimeForDisplay(booking.returnTime)}`;
-                        }
-                        return displayText;
-                      }
-                    }
-
-                    // Fallback to full dates with times
-                    displayText = `${startDateStr}`;
-                    if (booking.pickupTime) {
-                      displayText += ` ${formatTimeForDisplay(booking.pickupTime)}`;
-                    }
-                    displayText += ` - ${endDateStr}`;
-                    if (booking.returnTime) {
-                      displayText += ` ${formatTimeForDisplay(booking.returnTime)}`;
-                    }
-                    return displayText;
-                  } catch (error) {
-                    return 'Invalid dates';
-                  }
-                })()}
-              </Typography>
-            </Box>
-            <Stack alignItems="flex-end">
-              <Chip 
-                label={booking.status} 
-                size="small" 
-                sx={{ bgcolor: style.bg, color: style.text, fontWeight: 800, fontSize: 10 }} 
-              />
-              {(booking.status === 'DRAFT' || booking.status === 'AWAITING_VERIFICATION') && (
-                <Typography fontSize={10} color={booking.status === 'DRAFT' ? 'error.main' : 'primary.main'} fontWeight={700} mt={0.5}>
-                  {booking.status === 'DRAFT' ? timeLeft : (booking.verification ? 'Verification active' : '')}
-                </Typography>
-              )}
-            </Stack>
-            <ArrowIcon sx={{ fontSize: 14, color: '#94A3B8' }} />
-          </Stack>
-        </Box>
-      </Card>
-    </Fade>
-  );
-};
-
-// --- 🚀 SUB-COMPONENT: DETAILS MODAL ---
-const BookingDetailsModal = ({
-  open,
-  onClose,
-  booking,
-  data,
-  setBookingToCancel,
-  setCancelDialogOpen,
-  onCancelBooking
-}: any) => {
-  const router = useRouter();
-  const [verificationTimer, setVerificationTimer] = useState<string>('');
-  const [magicLink, setMagicLink] = useState<string>('');
-
-  const [resendVerification, { loading: resendLoading }] = useMutation(RESEND_VERIFICATION_LINK_MUTATION);
-
-  useEffect(() => {
-    if (booking?.status === 'AWAITING_VERIFICATION' && booking.verification && booking.verification.token) {
-      // Generate magic link for verification
-      const link = `${window.location.origin}/verification/${booking.verification.token}`;
-      setMagicLink(link);
-
-      // Set up 1-hour expiry timer
-      const interval = setInterval(() => {
-        const createdTime = new Date(booking.verification.createdAt).getTime();
-        const expiryTime = createdTime + (60 * 60 * 1000); // 1 hour expiry
-        const now = new Date().getTime();
-        const diff = expiryTime - now;
-
-        if (diff <= 0) {
-          setVerificationTimer('Expired');
-          clearInterval(interval);
-        } else {
-          const hours = Math.floor(diff / (1000 * 60 * 60));
-          const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-          const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-          setVerificationTimer(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
-        }
-      }, 1000);
-
-      return () => clearInterval(interval);
-    }
-  }, [booking]);
-
-  const handleContinueBooking = () => {
-    router.push(`/booking?bookingId=${booking.id}`);
-    onClose();
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
-
-  if (!booking) return null;
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth sx={{ m: { xs: 1, md: 5 }, borderRadius: { md: 4 } }}>
-      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E2E8F0', fontWeight: 900 }}>
-        Booking Details
-        <IconButton onClick={onClose}><CloseIcon /></IconButton>
-      </DialogTitle>
-      <DialogContent sx={{ p: { xs: 2, md: 3 }, bgcolor: '#F8FAFC' }}>
-        {/* Status Chip */}
-        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
-          <Chip
-            label={booking.status}
-            size="small"
-            sx={{
-              bgcolor: booking.status === 'DRAFT' ? '#FEF9C3' :
-                     booking.status === 'AWAITING_VERIFICATION' ? '#DBEAFE' :
-                     booking.status === 'CANCELLED' ? '#FEE2E2' : '#DCFCE7',
-              color: booking.status === 'DRAFT' ? '#854D0E' :
-                    booking.status === 'AWAITING_VERIFICATION' ? '#1E40AF' :
-                    booking.status === 'CANCELLED' ? '#991B1B' : '#166534',
-              fontWeight: 800,
-              fontSize: 12,
-              px: 2
-            }}
-          />
-        </Box>
-
-        {/* DRAFT Status - Continue Booking Button */}
-        {booking.status === 'DRAFT' && (
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 4, mb: 3, bgcolor: '#FEF9C3', border: '1px solid #FBBF24' }}>
-            <Stack direction="row" spacing={2} alignItems="center" mb={2}>
-              <EditIcon sx={{ color: '#854D0E' }} />
-              <Typography fontWeight={800} color="#854D0E">Draft Booking</Typography>
-            </Stack>
-            <Typography variant="body2" color="text.secondary" mb={3}>
-              Your booking is saved as a draft. Complete your reservation to secure this vehicle.
-            </Typography>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-              <Button
-                variant="contained"
-                fullWidth
-                onClick={handleContinueBooking}
-                sx={{
-                  bgcolor: '#854D0E',
-                  '&:hover': { bgcolor: '#713F12' },
-                  borderRadius: 2,
-                  fontWeight: 700,
-                  flex: 1
-                }}
-              >
-                Continue Booking
-              </Button>
-              <Button
-                variant="outlined"
-                fullWidth
-                onClick={() => onCancelBooking(booking.id)}
-                sx={{
-                  borderColor: '#DC2626',
-                  color: '#DC2626',
-                  '&:hover': {
-                    borderColor: '#B91C1C',
-                    bgcolor: '#FEF2F2'
-                  },
-                  borderRadius: 2,
-                  fontWeight: 700,
-                  flex: 1
-                }}
-              >
-                Cancel Booking
-              </Button>
-            </Stack>
-          </Paper>
-        )}
-
-        {/* CANCELLED Status - Read-Only View */}
-        {booking.status === 'CANCELLED' && (
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 4, mb: 3, bgcolor: '#FEE2E2', border: '1px solid #DC2626' }}>
-            <Stack direction="row" spacing={2} alignItems="center" mb={2}>
-              <ErrorIcon sx={{ color: '#991B1B' }} />
-              <Typography fontWeight={800} color="#991B1B">Booking Cancelled</Typography>
-            </Stack>
-
-            <Typography variant="body2" color="text.secondary" mb={3}>
-              This booking has been cancelled and is no longer available. You can view the details below but cannot modify or verify this booking.
-            </Typography>
-
-            <Alert severity="info" sx={{ mb: 2 }}>
-              <Typography variant="body2">
-                Cancelled bookings are read-only. If you need to make a new booking, please create a new reservation.
-              </Typography>
-            </Alert>
-          </Paper>
-        )}
-
-        {/* AWAITING_VERIFICATION Status - QR Code & Magic Link (Only show if NOT cancelled) */}
-        {booking.status === 'AWAITING_VERIFICATION' && booking.verification && booking.status !== 'CANCELLED' && (
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 4, mb: 3, bgcolor: '#DBEAFE', border: '1px solid #3B82F6' }}>
-            <Stack direction="row" spacing={2} alignItems="center" mb={2}>
-              <QrIcon sx={{ color: '#1E40AF' }} />
-              <Typography fontWeight={800} color="#1E40AF">Verification Required</Typography>
-            </Stack>
-
-            <Typography variant="body2" color="text.secondary" mb={3}>
-              Scan the QR code or use the magic link to verify your booking.
-              {booking.verification?.expiresAt && (
-                <><br />{getExpirationMessage(booking.verification.expiresAt)} (your local time)</>
-              )}
-            </Typography>
-
-            {/* Timer Display */}
-            <Box sx={{ textAlign: 'center', mb: 3 }}>
-              <Typography variant="h4" fontWeight={900} color="#1E40AF" sx={{ fontFamily: 'monospace' }}>
-                {verificationTimer}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {verificationTimer === 'Expired' ? 'Link has expired' : 'remaining'}
-              </Typography>
-            </Box>
-
-            {/* QR Code and Link Section */}
-            <Grid container spacing={3} alignItems="center">
-              <Grid item xs={12} md={6}>
-                <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                  <Box sx={{
-                    p: 2,
-                    bgcolor: 'white',
-                    borderRadius: 3,
-                    border: '2px solid #E2E8F0',
-                    display: 'inline-block'
-                  }}>
-                    <QRCode
-                      value={magicLink}
-                      size={160}
-                      style={{ height: 'auto', maxWidth: '100%', width: '100%' }}
-                    />
-                  </Box>
-                </Box>
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <Stack spacing={2}>
-                  <Typography variant="caption" color="primary" fontWeight={800} sx={{ textTransform: 'uppercase' }}>
-                    Magic Link
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    value={magicLink}
-                    InputProps={{
-                      readOnly: true,
-                      endAdornment: (
-                        <IconButton
-                          size="small"
-                          onClick={() => copyToClipboard(magicLink)}
-                          sx={{ color: 'primary.main' }}
-                        >
-                          <LinkIcon />
-                        </IconButton>
-                      )
-                    }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        bgcolor: 'white',
-                        borderRadius: 2
-                      }
-                    }}
-                  />
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    onClick={() => {
-                      // Open in new window/tab explicitly
-                      window.open(magicLink, '_blank', 'noopener,noreferrer');
-                    }}
-                    sx={{
-                      borderRadius: 2,
-                      fontWeight: 700,
-                      borderColor: '#1E40AF',
-                      color: '#1E40AF',
-                      '&:hover': {
-                        borderColor: '#1E40AF',
-                        bgcolor: '#EFF6FF'
-                      }
-                    }}
-                  >
-                    Open Verification Page (New Tab)
-                  </Button>
-                </Stack>
-              </Grid>
-            </Grid>
-          </Paper>
-        )}
-
-        {/* AWAITING_VERIFICATION Status - No Valid Verification Token */}
-        {booking.status === 'AWAITING_VERIFICATION' && !booking.verification && (
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 4, mb: 3, bgcolor: '#FEF3C7', border: '1px solid #F59E0B' }}>
-            <Stack direction="row" spacing={2} alignItems="center" mb={2}>
-              <QrIcon sx={{ color: '#92400E' }} />
-              <Typography fontWeight={800} color="#92400E">Verification Link Expired</Typography>
-            </Stack>
-
-            <Typography variant="body2" color="text.secondary" mb={3}>
-              Your verification link has expired. Request a new verification link to complete your booking.
-            </Typography>
-
-            <Button
-              variant="contained"
-              fullWidth
-              disabled={resendLoading}
-              onClick={async () => {
-                try {
-                  const { data } = await resendVerification({
-                    variables: { bookingId: booking.id }
-                  });
-
-                  if (data?.resendVerificationLink?.success) {
-                    alert('New verification link sent successfully!');
-                    // Optionally refresh the page or update the booking data
-                    window.location.reload();
-                  } else {
-                    throw new Error('Failed to resend verification link');
-                  }
-                } catch (error: any) {
-                  alert('Failed to resend verification link: ' + error.message);
-                }
-              }}
-              sx={{
-                bgcolor: '#92400E',
-                '&:hover': { bgcolor: '#78350F' },
-                borderRadius: 2,
-                fontWeight: 700
-              }}
-            >
-              Request New Verification Link
-            </Button>
-          </Paper>
-        )}
-
-        {/* CANCELLED Status - Read-Only Information */}
-        {booking.status === 'CANCELLED' && (
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 4, mb: 3, bgcolor: '#FEE2E2', border: '1px solid #F87171' }}>
-            <Stack direction="row" spacing={2} alignItems="center" mb={2}>
-              <CancelIcon sx={{ color: '#991B1B' }} />
-              <Typography fontWeight={800} color="#991B1B">Booking Cancelled</Typography>
-            </Stack>
-
-            <Typography variant="body2" color="text.secondary" mb={3}>
-              This booking session has expired and been automatically cancelled. You can only view the booking details.
-              If you need to create a new booking, please start the process again.
-            </Typography>
-
-            <Alert severity="info" sx={{ borderRadius: 2 }}>
-              <Typography variant="body2">
-                <strong>Reason:</strong> Booking was not verified within the 1-hour time limit.
-              </Typography>
-            </Alert>
-          </Paper>
-        )}
-
-        {/* Car Details */}
-        <Paper elevation={0} sx={{ p: 2, borderRadius: 4, mb: 3 }}>
-          <Typography variant="caption" color="primary" fontWeight={800}>CAR DETAILS</Typography>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mt={1} alignItems={{ xs: 'center', sm: 'flex-start' }}>
-            <Box sx={{ width: { xs: 120, sm: 100 }, height: { xs: 80, sm: 60 }, borderRadius: 2, overflow: 'hidden' }}>
-              <img src={booking.car.images[0]?.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            </Box>
-            <Box sx={{ textAlign: { xs: 'center', sm: 'left' } }}>
-              <Typography fontWeight={800}>{booking.car.brand.name} {booking.car.model.name}</Typography>
-              <Typography variant="body2" color="text.secondary">{booking.car.plateNumber}</Typography>
-            </Box>
-          </Stack>
-        </Paper>
-
-        {/* Booking Details */}
-        <Paper elevation={0} sx={{ p: 2, borderRadius: 4, mb: 3 }}>
-          <Typography variant="caption" color="primary" fontWeight={800}>BOOKING DETAILS</Typography>
-          <Stack spacing={2} mt={1}>
-            <Box display="flex" justifyContent="space-between">
-              <Typography variant="body2">Pickup Date & Time</Typography>
-              <Typography fontWeight={700}>
-                {formatDateForDisplay(booking.startDate)}
-                {booking.pickupTime && (
-                  <span> at {formatTimeForDisplay(booking.pickupTime)}</span>
-                )}
-              </Typography>
-            </Box>
-            <Box display="flex" justifyContent="space-between">
-              <Typography variant="body2">Return Date & Time</Typography>
-              <Typography fontWeight={700}>
-                {formatDateForDisplay(booking.endDate)}
-                {booking.returnTime && (
-                  <span> at {formatTimeForDisplay(booking.returnTime)}</span>
-                )}
-              </Typography>
-            </Box>
-            <Box display="flex" justifyContent="space-between">
-              <Typography variant="body2">Rental Type</Typography>
-              <Typography fontWeight={700}>{booking.rentalType}</Typography>
-            </Box>
-          </Stack>
-        </Paper>
-
-        {/* Financial Summary */}
-        <Paper elevation={0} sx={{ p: 2, borderRadius: 4, mb: 3 }}>
-          <Typography variant="caption" color="primary" fontWeight={800}>FINANCIAL SUMMARY</Typography>
-          <Stack spacing={1} mt={1}>
-            <Box display="flex" justifyContent="space-between">
-              <Typography variant="body2">Base Price</Typography>
-              <Typography fontWeight={700}>€{booking.basePrice?.toFixed(2)}</Typography>
-            </Box>
-            <Box display="flex" justifyContent="space-between">
-              <Typography variant="body2">Taxes</Typography>
-              <Typography fontWeight={700}>€{booking.taxAmount}</Typography>
-            </Box>
-            <Divider />
-            <Box display="flex" justifyContent="space-between">
-              <Typography fontWeight={900}>Total Paid</Typography>
-              <Typography fontWeight={900} color="primary">€{booking.totalPrice?.toFixed(2)}</Typography>
-            </Box>
-          </Stack>
-        </Paper>
-
-        {/* PENDING Status - QR Code and Actions */}
-        {booking.status === 'PENDING' && (
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 4, mb: 3, bgcolor: '#F0F9FF', border: '1px solid #0EA5E9' }}>
-            <Typography variant="h6" fontWeight={800} mb={3} color="#0EA5E9">
-              Complete Your Booking
-            </Typography>
-            <Typography variant="body2" color="text.secondary" mb={3}>
-              Your booking is pending verification. Scan the QR code or use the link below to complete the payment and secure your reservation.
-            </Typography>
-
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <Typography variant="subtitle2" fontWeight={700} mb={2}>
-                    Scan QR Code
-                  </Typography>
-                  <Box sx={{
-                    bgcolor: 'white',
-                    p: 2,
-                    borderRadius: 2,
-                    border: '1px solid #E2E8F0',
-                    display: 'inline-block'
-                  }}>
-                    <QRCode
-                      value={`${window.location.origin}/booking?carId=${booking.carId}&bookingId=${booking.id}`}
-                      size={120}
-                    />
-                  </Box>
-                </Box>
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <Typography variant="subtitle2" fontWeight={700} mb={2}>
-                    Or Use This Link
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    value={`${window.location.origin}/booking?carId=${booking.carId}&bookingId=${booking.id}`}
-                    InputProps={{
-                      readOnly: true,
-                      endAdornment: (
-                        <IconButton
-                          onClick={() => {
-                            navigator.clipboard.writeText(`${window.location.origin}/booking?carId=${booking.carId}&bookingId=${booking.id}`);
-                            // You could add a toast notification here
-                          }}
-                          size="small"
-                        >
-                          <LinkIcon />
-                        </IconButton>
-                      ),
-                    }}
-                    sx={{ mb: 3 }}
-                  />
-
-                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} width="100%">
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      startIcon={<EditIcon />}
-                      onClick={() => {
-                        onClose();
-                        router.push(`/booking?carId=${booking.carId}&bookingId=${booking.id}`);
-                      }}
-                      sx={{
-                        bgcolor: '#0EA5E9',
-                        '&:hover': { bgcolor: '#0284C7' }
-                      }}
-                    >
-                      Change Details
-                    </Button>
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      color="error"
-                      onClick={() => onCancelBooking(booking.id)}
-                    >
-                      Cancel Booking
-                    </Button>
-                  </Stack>
-                </Box>
-              </Grid>
-            </Grid>
-          </Paper>
-        )}
-
-        {/* Other Status Info */}
-        {booking.status !== 'DRAFT' && booking.status !== 'AWAITING_VERIFICATION' && booking.status !== 'PENDING' && (
-          <Alert severity="info" sx={{ borderRadius: 3 }}>
-            <Typography variant="caption" fontWeight={700}>Status: {booking.status}</Typography>
-            <Typography variant="body2">
-              Your booking is {booking.status.toLowerCase()}.
-            </Typography>
-          </Alert>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-};

@@ -4,16 +4,15 @@ import React, { useState } from 'react';
 import {
   AppBar, Toolbar, Typography, Button, Box, IconButton,
   Drawer, List, ListItem, ListItemButton, ListItemText, MenuItem, Menu,
-  Avatar, Tooltip, Container, Stack
+  Avatar, Tooltip, Container, Stack,
+  Link
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
-import SearchIcon from '@mui/icons-material/Search';
 import DriveEtaIcon from '@mui/icons-material/DriveEta';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { deleteCookie } from 'cookies-next';
-import Link from 'next/link';
 import { useQuery, useApolloClient } from '@apollo/client';
 import { GET_ME_QUERY, GET_PLATFORM_SETTINGS_QUERY } from '@/lib/graphql/queries';
 
@@ -68,9 +67,22 @@ export default function Navbar() {
         <Container maxWidth="xl">
           <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
 
-            {/* 1. BRAND / LOGO (Left) */}
+            {/* --- MOBILE: Hamburger Menu (Left) --- */}
+            <IconButton 
+              sx={{ display: { xs: 'flex', md: 'none' }, color: '#0F172A' }}
+              onClick={() => setMobileOpen(true)}
+            >
+              <MenuIcon />
+            </IconButton>
+
+            {/* 1. BRAND / LOGO SECTION - Hidden on Mobile */}
             <Box 
-              sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 1 }}
+              sx={{ 
+                display: { xs: 'none', md: 'flex' }, // 🛑 இது மொபைலில் லோகோவை மறைக்கும்
+                alignItems: 'center', 
+                cursor: 'pointer', 
+                gap: 1 
+              }}
               onClick={() => router.push('/')}
             >
               {settings.logoUrl ? (
@@ -88,11 +100,11 @@ export default function Navbar() {
                   letterSpacing: '-0.5px'
                 }}
               >
-                {settings.companyName || 'Dream Drive'}
+                {settings.companyName}
               </Typography>
             </Box>
 
-            {/* 2. CENTER NAVIGATION (Desktop) - Pill Style */}
+            {/* 2. CENTER NAVIGATION (Desktop Only) - Pill Style */}
             <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center' }}>
               <Box 
                 sx={{ 
@@ -133,10 +145,8 @@ export default function Navbar() {
               </Box>
             </Box>
 
-            {/* 3. RIGHT SECTION (Search + Login/User) */}
+            {/* 3. RIGHT SECTION (Login/User) */}
             <Stack direction="row" spacing={1} alignItems="center">
-
-              {/* Login / Profile */}
               {!isLoggedIn ? (
                 <Button
                   variant="contained"
@@ -147,10 +157,10 @@ export default function Navbar() {
                     borderRadius: '100px',
                     textTransform: 'none',
                     fontWeight: 600,
-                    px: 4,
-                    py: 1.2,
+                    px: { xs: 3, md: 4 },
+                    py: 1,
                     boxShadow: 'none',
-                    display: { xs: 'none', md: 'block' },
+                    fontSize: { xs: '0.85rem', md: '1rem' },
                     '&:hover': {
                       bgcolor: '#334155',
                       boxShadow: 'none'
@@ -161,29 +171,21 @@ export default function Navbar() {
                 </Button>
               ) : (
                 <Tooltip title="Account Settings">
-                  <IconButton onClick={handleOpenUserMenu} sx={{ p: 0, ml: 1 }}>
+                  <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
                     <Avatar
                       sx={{
                         bgcolor: '#0F172A',
                         color: 'white',
                         fontWeight: 'bold',
-                        width: 40,
-                        height: 40
+                        width: { xs: 35, md: 40 },
+                        height: { xs: 35, md: 40 }
                       }}
                     >
-                      {session?.user?.name ? session.user.name[0].toUpperCase() : (userData?.me?.firstName ? userData.me.firstName[0].toUpperCase() : 'U')}
+                      {session?.user?.name ? session.user.name[0].toUpperCase() : (userData?.me?.fullName ? userData.me.fullName[0].toUpperCase() : 'U')}
                     </Avatar>
                   </IconButton>
                 </Tooltip>
               )}
-
-              {/* Mobile Menu Toggle */}
-              <IconButton 
-                sx={{ display: { xs: 'flex', md: 'none' }, color: '#0F172A' }}
-                onClick={() => setMobileOpen(true)}
-              >
-                <MenuIcon />
-              </IconButton>
             </Stack>
 
           </Toolbar>
@@ -213,9 +215,9 @@ export default function Navbar() {
       >
         <Box sx={{ px: 2.5, py: 2 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0F172A' }}>
-            {userData?.me?.firstName} {userData?.me?.lastName}
+            {userData?.me?.fullName}
           </Typography>
-          <Typography variant="caption" color="text.secondary">
+          <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
             {userData?.me?.email}
           </Typography>
         </Box>
@@ -234,16 +236,19 @@ export default function Navbar() {
 
       {/* Mobile Drawer */}
       <Drawer
-        anchor="right"
+        anchor="left"
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
-        sx={{ '& .MuiDrawer-paper': { width: '100%', maxWidth: 300, bgcolor: 'white' } }}
+        sx={{ '& .MuiDrawer-paper': { width: '85vw', maxWidth: 320, bgcolor: 'white' } }}
       >
         <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-            <Typography variant="h6" fontWeight={700} color="#0F172A">
-              Menu
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <DriveEtaIcon sx={{ color: '#0F172A' }} />
+              <Typography variant="h6" fontWeight={700} color="#0F172A">
+                {settings.companyName}
+              </Typography>
+            </Box>
             <IconButton onClick={() => setMobileOpen(false)} color="inherit">
               <CloseIcon />
             </IconButton>
@@ -251,7 +256,7 @@ export default function Navbar() {
 
           <List sx={{ flexGrow: 1 }}>
             {navItems.map((item) => (
-              <ListItem key={item.path} disablePadding sx={{ mb: 2 }}>
+              <ListItem key={item.path} disablePadding sx={{ mb: 1 }}>
                 <ListItemButton
                   component={Link}
                   href={item.path}
@@ -264,9 +269,9 @@ export default function Navbar() {
                   <ListItemText
                     primary={item.label}
                     primaryTypographyProps={{
-                      fontSize: '1.1rem',
+                      fontSize: '1rem',
                       fontWeight: pathname === item.path ? 700 : 500,
-                      color: '#0F172A'
+                      color: pathname === item.path ? '#0F172A' : '#64748B'
                     }}
                   />
                 </ListItemButton>
@@ -282,8 +287,8 @@ export default function Navbar() {
               sx={{
                 bgcolor: '#0F172A',
                 color: 'white',
-                borderRadius: '12px',
-                py: 2,
+                borderRadius: '100px',
+                py: 1.5,
                 fontSize: '1rem',
                 fontWeight: 700,
                 textTransform: 'none'

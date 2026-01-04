@@ -324,7 +324,6 @@ export default function CarsListingPage() {
                   </Box>
 
                   <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, bgcolor: '#E2E8F0', height: 30, alignSelf: 'center' }} />
-                  <Divider orientation="horizontal" flexItem sx={{ display: { xs: 'block', md: 'none' }, width: '100%' }} />
 
                   {/* Return Section */}
                   <Box sx={{ display: 'flex', flex: 1, width: '100%', alignItems: 'center', px: 2, py: 1 }}>
@@ -334,7 +333,7 @@ export default function CarsListingPage() {
                       value={mainFilter.endDate}
                       onChange={(e) => handleDateChange('endDate', e.target.value)}
                       InputProps={{ 
-                        startAdornment: <InputAdornment position="start"><ArrowForwardIcon fontSize="small" sx={{color: mainFilter.endDate ? '#7C3AED' : 'text.secondary'}}/></InputAdornment>,
+                        startAdornment: <InputAdornment position="start"></InputAdornment>,
                         disableUnderline: true,
                         sx: { fontSize: '0.95rem', fontWeight: 600 }
                       }}
@@ -413,9 +412,6 @@ export default function CarsListingPage() {
               <Typography variant="h5" fontWeight={800} color="#0F172A">
                 {loading ? 'Fetching cars...' : `${data?.cars?.length || 0} Cars Available`}
               </Typography>
-              {!isValidSelection && (
-                <Chip label="Browsing Mode - Select dates to check availability" color="default" size="small" variant="outlined" />
-              )}
             </Box>
 
             <Grid container spacing={3}>
