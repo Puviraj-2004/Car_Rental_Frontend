@@ -41,6 +41,7 @@ export default function DriverVerificationPage({ params }: { params: Promise<{ t
 
   // Previews & Form Data
   const [previews, setPreviews] = useState({ licenseFront: '', licenseBack: '', cni: '', address: '' });
+  const [files, setFiles] = useState<{ licenseFront?: File; licenseBack?: File; cni?: File; address?: File }>({});
   const [licenseData, setLicenseData] = useState({ name: '', number: '', expiry: '', categories: [] as string[], restrictsToAutomatic: undefined as boolean | undefined });
   const [cniData, setCniData] = useState({ name: '', number: '', dob: '' });
   const [addressData, setAddressData] = useState({ address: '' });
@@ -76,6 +77,14 @@ export default function DriverVerificationPage({ params }: { params: Promise<{ t
       else if (type === 'ADDRESS_PROOF') setPreviews(p => ({ ...p, address: result }));
     };
     reader.readAsDataURL(file);
+
+    setFiles((prev) => {
+      if (type === 'LICENSE' && side === 'FRONT') return { ...prev, licenseFront: file };
+      if (type === 'LICENSE' && side === 'BACK') return { ...prev, licenseBack: file };
+      if (type === 'ID_CARD') return { ...prev, cni: file };
+      if (type === 'ADDRESS_PROOF') return { ...prev, address: file };
+      return prev;
+    });
 
     try {
       const { data } = await processOCR({ variables: { file, documentType: type, side } });
@@ -132,10 +141,15 @@ export default function DriverVerificationPage({ params }: { params: Promise<{ t
       await updateProfile({
         variables: {
           input: {
+            bookingToken: token,
             licenseNumber: licenseData.number,
             licenseExpiry: licenseData.expiry,
             licenseCategory: (licenseData.categories[0] || 'B'),
             idNumber: cniData.number,
+            licenseFrontFile: files.licenseFront,
+            licenseBackFile: files.licenseBack,
+            idCardFile: files.cni,
+            addressProofFile: files.address,
           }
         }
       });

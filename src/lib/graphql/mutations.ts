@@ -218,6 +218,10 @@ export const CREATE_OR_UPDATE_VERIFICATION_MUTATION = gql`
     createOrUpdateVerification(input: $input) {
       id
       userId
+      licenseFrontUrl
+      licenseBackUrl
+      idCardUrl
+      addressProofUrl
       licenseNumber
       licenseExpiry
       licenseCategory
