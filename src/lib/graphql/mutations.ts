@@ -232,6 +232,29 @@ export const CREATE_OR_UPDATE_VERIFICATION_MUTATION = gql`
   }
 `;
 
+export const CREATE_STRIPE_CHECKOUT_SESSION_MUTATION = gql`
+  mutation CreateStripeCheckoutSession($bookingId: ID!) {
+    createStripeCheckoutSession(bookingId: $bookingId) {
+      url
+      sessionId
+    }
+  }
+`;
+
+export const MOCK_FINALIZE_PAYMENT_MUTATION = gql`
+  mutation MockFinalizePayment($bookingId: ID!, $success: Boolean!) {
+    mockFinalizePayment(bookingId: $bookingId, success: $success) {
+      id
+      status
+      amount
+      booking {
+        id
+        status
+      }
+    }
+  }
+`;
+
 export const SEND_VERIFICATION_LINK_MUTATION = gql`
   mutation SendBookingVerificationLink($bookingId: ID!) {
     sendBookingVerificationLink(bookingId: $bookingId) {

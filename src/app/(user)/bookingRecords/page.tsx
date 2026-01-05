@@ -264,6 +264,22 @@ export default function BookingRecordsPage() {
                 <Chip label={selectedBooking.status} size="small" sx={{ fontWeight: 900 }} />
               </Box>
 
+              {selectedBooking.status === 'VERIFIED' && (
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} mt={3}>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/payment/${selectedBooking.id}`);
+                    }}
+                    sx={{ fontWeight: 900, bgcolor: '#0F172A' }}
+                  >
+                    Pay Now
+                  </Button>
+                </Stack>
+              )}
+
               {selectedBooking.status === 'CANCELLED' && (
                 <Alert severity="error" sx={{ mt: 3, borderRadius: 2 }}>This booking has been cancelled.</Alert>
               )}
