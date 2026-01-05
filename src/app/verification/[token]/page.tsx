@@ -6,8 +6,10 @@ import { useMutation, useQuery } from '@apollo/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Box, Button, Typography, Paper, Grid, TextField, 
-  Stepper, Step, StepLabel, CircularProgress, Card, Stack, Container, Chip, Alert, IconButton
+  Stepper, Step, StepLabel, CircularProgress, Card, Stack, Container, Chip, Alert, IconButton,
+  FormGroup, FormControlLabel, Checkbox
 } from '@mui/material';
+
 import {
   CloudUpload as CloudUploadIcon,
   CheckCircle as CheckCircleIcon,
@@ -19,17 +21,17 @@ import {
   AutoAwesome as AIScanIcon,
   Close as CloseIcon
 } from '@mui/icons-material';
-import { CREATE_OR_UPDATE_DRIVER_PROFILE_MUTATION, PROCESS_DOCUMENT_OCR_MUTATION } from '@/lib/graphql/mutations';
+import { CREATE_OR_UPDATE_VERIFICATION_MUTATION, PROCESS_DOCUMENT_OCR_MUTATION } from '@/lib/graphql/mutations';
 import { GET_BOOKING_BY_TOKEN_QUERY } from '@/lib/graphql/queries';
 
 export default function DriverVerificationPage({ params }: { params: Promise<{ token: string }> }) {
   const router = useRouter();
   const { token } = use(params);
-  
+
   // Queries & Mutations
   const { data: bookingData } = useQuery(GET_BOOKING_BY_TOKEN_QUERY, { variables: { token }, skip: !token });
   const [processOCR] = useMutation(PROCESS_DOCUMENT_OCR_MUTATION);
-  const [updateProfile] = useMutation(CREATE_OR_UPDATE_DRIVER_PROFILE_MUTATION);
+  const [updateProfile] = useMutation(CREATE_OR_UPDATE_VERIFICATION_MUTATION);
 
   // UI States
   const [currentStep, setCurrentStep] = useState(0);
@@ -39,7 +41,7 @@ export default function DriverVerificationPage({ params }: { params: Promise<{ t
 
   // Previews & Form Data
   const [previews, setPreviews] = useState({ licenseFront: '', licenseBack: '', cni: '', address: '' });
-  const [licenseData, setLicenseData] = useState({ name: '', number: '', expiry: '', category: '' });
+  const [licenseData, setLicenseData] = useState({ name: '', number: '', expiry: '', categories: [] as string[], restrictsToAutomatic: undefined as boolean | undefined });
   const [cniData, setCniData] = useState({ name: '', number: '', dob: '' });
   const [addressData, setAddressData] = useState({ address: '' });
 
@@ -60,6 +62,7 @@ export default function DriverVerificationPage({ params }: { params: Promise<{ t
   const isAddressComplete = useMemo(() => !!(previews.address && addressData.address), [addressData, previews]);
 
   const handleFileUpload = async (file: File, type: string, side?: string) => {
+
     const scanKey = side ? `${type}_${side}` : type;
     setActiveScanning(scanKey);
 
@@ -79,17 +82,43 @@ export default function DriverVerificationPage({ params }: { params: Promise<{ t
       const res = data?.processDocumentOCR;
 
       if (type === 'LICENSE') {
-        setLicenseData(p => ({ 
-          ...p, 
-          name: res.fullName || p.name, 
-          number: res.licenseNumber || p.number, 
-          expiry: res.expiryDate || p.expiry,
-          category: res.licenseCategory || p.category // Might be undefined from front scan
-        }));
+        setLicenseData(p => {
+          const ocrName = (res?.fullName || `${res?.firstName || ''} ${res?.lastName || ''}`.trim()).trim();
+          const ocrCategories: string[] = Array.isArray(res?.licenseCategories)
+            ? res.licenseCategories
+            : (res?.licenseCategory ? [res.licenseCategory] : []);
+
+          if (side === 'FRONT') {
+            return {
+              ...p,
+              name: ocrName || p.name,
+              number: res?.licenseNumber || p.number,
+              expiry: res?.expiryDate || p.expiry,
+            };
+          }
+
+          if (side === 'BACK') {
+            return {
+              ...p,
+              name: ocrName || p.name,
+              expiry: res?.expiryDate || p.expiry,
+              categories: ocrCategories.length ? Array.from(new Set(ocrCategories)) : p.categories,
+              restrictsToAutomatic: typeof res?.restrictsToAutomatic === 'boolean' ? res.restrictsToAutomatic : p.restrictsToAutomatic,
+            };
+          }
+
+          return p;
+        });
       } else if (type === 'ID_CARD') {
-        setCniData(p => ({ ...p, name: res.fullName || p.name, number: res.documentId || p.number, dob: res.birthDate || p.dob }));
+        const inferredName = (res?.fullName || `${res?.firstName || ''} ${res?.lastName || ''}`.trim()).trim();
+        setCniData(p => ({
+          ...p,
+          name: inferredName || p.name,
+          number: res?.documentId || p.number,
+          dob: res?.birthDate || p.dob
+        }));
       } else if (type === 'ADDRESS_PROOF') {
-        setAddressData(p => ({ ...p, address: res.address || p.address }));
+        setAddressData(p => ({ ...p, address: res?.address || p.address }));
       }
     } catch (e) {
       console.error("AI Error:", e);
@@ -105,10 +134,8 @@ export default function DriverVerificationPage({ params }: { params: Promise<{ t
           input: {
             licenseNumber: licenseData.number,
             licenseExpiry: licenseData.expiry,
-            licenseCategory: licenseData.category || 'B', // Fallback to B
+            licenseCategory: (licenseData.categories[0] || 'B'),
             idNumber: cniData.number,
-            birthDate: cniData.dob,
-            address: addressData.address,
           }
         }
       });
@@ -227,17 +254,46 @@ export default function DriverVerificationPage({ params }: { params: Promise<{ t
                     <Grid item xs={12} sm={4}><TextField label="License Number" fullWidth value={licenseData.number} onChange={e => setLicenseData({...licenseData, number: e.target.value})}/></Grid>
                     <Grid item xs={12} sm={4}><TextField label="Expiry Date" fullWidth placeholder="YYYY-MM-DD" value={licenseData.expiry} onChange={e => setLicenseData({...licenseData, expiry: e.target.value})}/></Grid>
                     <Grid item xs={12} sm={4}>
-                      <TextField 
-                        select label="Category" fullWidth value={licenseData.category} 
-                        onChange={e => setLicenseData({...licenseData, category: e.target.value})}
-                        SelectProps={{ native: true }}
-                      >
-                        <option value="AM">AM</option>
-                        <option value="A">A</option>
-                        <option value="B">B</option>
-                        <option value="C">C</option>
-                        <option value="D">D</option>
-                      </TextField>
+                      <Typography variant="caption" fontWeight={700} sx={{ display: 'block', mb: 1, color: 'text.secondary' }}>
+                        License Categories
+                      </Typography>
+                      <FormGroup row>
+                        {([
+                          'AM',
+                          'A1', 'A2', 'A',
+                          'B1', 'B', 'BE',
+                          'C1', 'C', 'C1E', 'CE',
+                          'D1', 'D', 'D1E', 'DE',
+                        ] as const).map((cat) => (
+                          <FormControlLabel
+                            key={cat}
+                            control={
+                              <Checkbox
+                                checked={licenseData.categories.includes(cat)}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setLicenseData((prev) => ({
+                                    ...prev,
+                                    categories: checked
+                                      ? Array.from(new Set([...prev.categories, cat]))
+                                      : prev.categories.filter((c) => c !== cat),
+                                  }));
+                                }}
+                              />
+                            }
+                            label={cat}
+                          />
+                        ))}
+                      </FormGroup>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={!!licenseData.restrictsToAutomatic}
+                            onChange={(e) => setLicenseData((prev) => ({ ...prev, restrictsToAutomatic: e.target.checked }))}
+                          />
+                        }
+                        label="Automatic only"
+                      />
                     </Grid>
                   </Grid>
                 </Stack>

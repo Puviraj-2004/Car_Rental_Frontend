@@ -24,7 +24,7 @@ const COLORS = {
 export default function RegisterPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    username: '', email: '', password: '', phoneNumber: '', gdprConsent: false
+    fullName: '', email: '', password: '', phoneNumber: '', gdprConsent: false
   });
   
   const [showPassword, setShowPassword] = useState(false);
@@ -53,7 +53,7 @@ export default function RegisterPage() {
     register({ 
       variables: { 
         input: { 
-          username: formData.username,
+          fullName: formData.fullName,
           email: formData.email,
           password: formData.password,
           phoneNumber: formData.phoneNumber
@@ -114,12 +114,12 @@ export default function RegisterPage() {
 
               <Stack spacing={2}>
                 
-                {/* 1. Username */}
+                {/* 1. Full Name */}
                 <TextField 
-                  fullWidth placeholder="Username" sx={inputStyles}
+                  fullWidth placeholder="Full Name" sx={inputStyles}
                   autoComplete="one-time-code"
-                  value={formData.username} 
-                  onChange={(e) => setFormData({...formData, username: e.target.value})} 
+                  value={formData.fullName} 
+                  onChange={(e) => setFormData({...formData, fullName: e.target.value})} 
                   InputProps={{ startAdornment: <InputAdornment position="start"><PersonOutline fontSize="small"/></InputAdornment> }} 
                 />
 

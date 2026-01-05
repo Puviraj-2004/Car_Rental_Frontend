@@ -9,7 +9,7 @@ export const REGISTER_MUTATION = gql`
       token
       user {
         id
-        username
+        fullName
         email
         phoneNumber
         role
@@ -26,7 +26,7 @@ export const LOGIN_MUTATION = gql`
       token
       user {
         id
-        username
+        fullName
         email
         phoneNumber
         role
@@ -43,7 +43,7 @@ export const GOOGLE_LOGIN_MUTATION = gql`
       token
       user {
         id
-        username
+        fullName
         email
         role
       }
@@ -213,18 +213,16 @@ export const RESEND_VERIFICATION_LINK_MUTATION = gql`
   }
 `;
 
-export const CREATE_OR_UPDATE_DRIVER_PROFILE_MUTATION = gql`
-  mutation CreateOrUpdateDriverProfile($input: DriverProfileInput!) {
-    createOrUpdateDriverProfile(input: $input) {
+export const CREATE_OR_UPDATE_VERIFICATION_MUTATION = gql`
+  mutation CreateOrUpdateVerification($input: DocumentVerificationInput!) {
+    createOrUpdateVerification(input: $input) {
       id
+      userId
       licenseNumber
-      licenseCategory
-      licenseCategories
-      restrictsToAutomatic
       licenseExpiry
-      dateOfBirth
-      isYoungDriver
-      address
+      licenseCategory
+      idNumber
+      idExpiry
       status
     }
   }
@@ -267,12 +265,17 @@ export const CANCEL_BOOKING_MUTATION = gql`
 export const PROCESS_DOCUMENT_OCR_MUTATION = gql`
   mutation ProcessDocumentOCR($file: Upload!, $documentType: DocumentType, $side: DocumentSide) {
     processDocumentOCR(file: $file, documentType: $documentType, side: $side) {
+      firstName
+      lastName
       fullName
+      documentId
       licenseNumber
       expiryDate
       birthDate
       address
       licenseCategory
+      licenseCategories
+      restrictsToAutomatic
       isQuotaExceeded
       fallbackUsed
     }
@@ -304,7 +307,7 @@ export const FINALIZE_BOOKING_RETURN_MUTATION = gql`
   }
 `;
 
-// --- 💳 PAYMENT ---
+// --- PAYMENT ---
 
 export const CREATE_PAYMENT_MUTATION = gql`
   mutation CreatePayment($input: CreatePaymentInput!) {
@@ -320,31 +323,7 @@ export const CREATE_PAYMENT_MUTATION = gql`
   }
 `;
 
-// --- 🪪 DRIVER PROFILE (KYC) ---
-
-export const CREATE_DRIVER_PROFILE_MUTATION = gql`
-  mutation CreateOrUpdateDriverProfile($input: DriverProfileInput!) {
-    createOrUpdateDriverProfile(input: $input) {
-      id
-      status
-      licenseNumber
-      verificationNote
-    }
-  }
-`;
-
-export const VERIFY_DRIVER_PROFILE_MUTATION = gql`
-  mutation VerifyDriverProfile($userId: ID!, $status: VerificationStatus!, $note: String) {
-    verifyDriverProfile(userId: $userId, status: $status, note: $note) {
-      id
-      userId
-      status
-      verificationNote
-    }
-  }
-`;
-
-// --- 🏷️ INVENTORY (BRAND & MODEL) ---
+// --- INVENTORY (BRAND & MODEL) ---
 
 export const CREATE_BRAND_MUTATION = gql`
   mutation CreateBrand($name: String!, $logoUrl: String) {
@@ -402,7 +381,7 @@ export const UPDATE_USER_MUTATION = gql`
   mutation UpdateUser($input: UpdateUserInput!) {
     updateUser(input: $input) {
       id
-      username
+      fullName
       phoneNumber
     }
   }
