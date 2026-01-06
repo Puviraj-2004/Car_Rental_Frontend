@@ -541,22 +541,6 @@ function BookingContent() {
              <Typography sx={{ opacity: 0.9, lineHeight: 1.6, fontSize: '1.05rem', mb: 5 }}>
                Your reservation is held. Complete the verification process now to fully secure your vehicle.
              </Typography>
-             
-            {/* Warning Footer */}
-             <Alert 
-               severity="warning" 
-               icon={<WarningAmber sx={{ color: '#B45309' }} />}
-               sx={{ 
-                 mt: 5, 
-                 borderRadius: 4, 
-                 textAlign: 'left', 
-                 bgcolor: '#FFFBEB', 
-                 border: '1px solid #FEF3C7',
-                 '& .MuiAlert-message': { color: '#92400E', fontWeight: 500, fontSize: '0.85rem' }
-               }}
-             >
-                Important: If verification is not started within 1 hour, your booking will be automatically cancelled to release the vehicle.
-             </Alert>
           </Grid>
 
           {/* Right Side: QR & Actions */}
