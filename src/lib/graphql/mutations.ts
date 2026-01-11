@@ -419,3 +419,51 @@ export const DELETE_USER_MUTATION = gql`
     deleteUser(id: $id)
   }
 `;
+
+export const START_TRIP_MUTATION = gql`
+  mutation StartTrip($bookingId: ID!) {
+    startTrip(bookingId: $bookingId) {
+      id
+      status
+      car {
+        id
+        status
+      }
+    }
+  }
+`;
+
+export const COMPLETE_TRIP_MUTATION = gql`
+  mutation CompleteTrip($bookingId: ID!) {
+    completeTrip(bookingId: $bookingId) {
+      id
+      status
+      car {
+        id
+        status
+      }
+    }
+  }
+`;
+
+export const FINISH_CAR_MAINTENANCE_MUTATION = gql`
+  mutation FinishCarMaintenance($carId: ID!) {
+    finishCarMaintenance(carId: $carId) {
+      id
+      status
+    }
+  }
+`;
+
+export const VERIFY_DRIVER_PROFILE_MUTATION = gql`
+  mutation VerifyDocument($userId: ID!, $status: VerificationStatus!, $reason: String) {
+    verifyDocument(userId: $userId, status: $status, reason: $reason) {
+      id
+      status
+    }
+  }
+`;
+
+
+
+

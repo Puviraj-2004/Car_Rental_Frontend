@@ -5,9 +5,7 @@ export default function VerificationLayout({
 }) {
   return (
     <div className="min-h-screen">
-      {/* No navigation/header - strict flow */}
       {children}
-      {/* No footer - strict flow */}
     </div>
   );
 }

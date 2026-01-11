@@ -1,7 +1,7 @@
 // src/app/(auth)/layout.tsx
 import React from 'react';
 import { Box } from '@mui/material';
-import Navbar from '@/components/Navbar';
+import Navbar from '@/components/features/layout/Navbar';
 
 export default function AuthLayout({
   children,

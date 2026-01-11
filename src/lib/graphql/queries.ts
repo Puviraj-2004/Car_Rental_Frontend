@@ -86,21 +86,16 @@ export const GET_ALL_BOOKINGS_QUERY = gql`
       id
       startDate
       endDate
-
-      # Meter Tracking
-      startOdometer
-      endOdometer
-      extraKmFee 
-
-      # Financials
+      pickupTime
+      returnTime
       totalPrice
       basePrice
       taxAmount
       depositAmount
-
       status
       bookingType
       repairOrderId
+      createdAt
       user {
         id
         fullName
@@ -108,20 +103,15 @@ export const GET_ALL_BOOKINGS_QUERY = gql`
         phoneNumber
       }
       car {
+        id
+        plateNumber
+        status
         brand { name }
         model { name }
-        plateNumber
-        dailyKmLimit
-        extraKmCharge
-        requiredLicense
         images {
           url
           isPrimary
         }
-      }
-      payment {
-        status
-        amount
       }
     }
   }

@@ -1,6 +1,6 @@
 import React from 'react';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
+import Navbar from '@/components/features/layout/Navbar';
+import Footer from '@/components/features/layout/Footer';
 import Box from '@mui/material/Box';
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
