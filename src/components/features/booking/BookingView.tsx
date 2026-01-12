@@ -18,16 +18,31 @@ export const BookingView = ({
   router, car, startDate, setStartDate, startTime, setStartTime, 
   endDate, setEndDate, endTime, setEndTime, generateTimeOptions, getMinPickupDate,
   checkingAvailability, isCarAvailable, hasDates, priceDetails, 
-  platformData, createBookingLoading, confirmReservationLoading,
+  platformData, createBookingLoading, confirmReservationLoading, updateBookingLoading,
   changeCarDialog, setChangeCarDialog, availableCarsLoading, availableCarsData, startDateTime, endDateTime,
   emailVerificationPopup, confirmedBookingData, verificationTimer, copySuccess, handleCopyLink, onConfirmAction
-}: any) => {
+ }: any) => {
+  // Determine back button destination dynamically
+  const getBackButtonInfo = () => {
+    if (typeof window !== 'undefined') {
+      const referrer = document.referrer;
+      const currentUrl = window.location.href;
+      
+      // Check if coming from booking records or has bookingId in URL
+      if (referrer.includes('/bookingRecords') || currentUrl.includes('bookingId=')) {
+        return { text: 'Back to Records', route: '/bookingRecords', isModifyMode: true };
+      }
+    }
+    return { text: 'Back to Fleet', route: '/cars', isModifyMode: false };
+  };
+  
+  const backButtonInfo = getBackButtonInfo();
   return (
     <Box sx={{ bgcolor: '#F8FAFC', minHeight: '100vh', pb: 12 }}>
       <Container maxWidth="xl" sx={{ }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
-          <Stack direction="row" alignItems="center" spacing={1} onClick={() => router.push('/cars')} sx={{ cursor: 'pointer', color: '#64748B' }}>
-            <ArrowBack fontSize="small" /> <Typography fontWeight={600}>Back to Fleet</Typography>
+          <Stack direction="row" alignItems="center" spacing={1} onClick={() => router.push(backButtonInfo.route)} sx={{ cursor: 'pointer', color: '#64748B' }}>
+            <ArrowBack fontSize="small" /> <Typography fontWeight={600}>{backButtonInfo.text}</Typography>
           </Stack>
           <Typography variant="h5" fontWeight={800} color="#0F172A">Secure Checkout</Typography>
           <Box width={50} />
@@ -119,7 +134,9 @@ export const BookingView = ({
                          No charge now. Payment collected after verification.
                        </Typography>
                     </Box>
-                    <Button fullWidth variant="contained" size="large" onClick={onConfirmAction} disabled={!isCarAvailable || createBookingLoading || confirmReservationLoading} sx={{ mt: 1, bgcolor: '#0F172A', py: 1.5, fontWeight: 800 }}>Confirm Reservation</Button>
+                    <Button fullWidth variant="contained" size="large" onClick={onConfirmAction} disabled={!isCarAvailable || createBookingLoading || confirmReservationLoading || updateBookingLoading} sx={{ mt: 1, bgcolor: '#0F172A', py: 1.5, fontWeight: 800 }}>
+                      {backButtonInfo.isModifyMode ? 'Update Booking' : 'Confirm Reservation'}
+                    </Button>
                  </Stack>
                ) : (
                  <Box textAlign="center" py={4} color="text.secondary">Select dates to view price breakdown.</Box>

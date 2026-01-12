@@ -104,7 +104,15 @@ export const CarsContainer = () => {
           }
         }
       });
-      if (data?.createBooking?.id) router.push(`/booking?bookingId=${data.createBooking.id}`);
+      if (data?.createBooking?.id) {
+        const params = new URLSearchParams({
+          bookingId: data.createBooking.id,
+          carId: car.id,
+          start: `${mainFilter.startDate}T${mainFilter.startTime}`,
+          end: `${mainFilter.endDate}T${mainFilter.endTime}`
+        });
+        router.push(`/booking?${params.toString()}`);
+      }
     } catch (e: any) {
       setAlert({ open: true, message: e.message, severity: 'error' });
     }

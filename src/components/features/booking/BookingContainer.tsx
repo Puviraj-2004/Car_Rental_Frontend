@@ -88,7 +88,8 @@ export const BookingContainer = () => {
     userData, platformData, bookingData, bookingLoading, bookingError,
     carData, carLoading, carError,
     availabilityData, checkingAvailability, availableCarsData, availableCarsLoading,
-    createBooking, createBookingLoading, confirmReservation, confirmReservationLoading 
+    createBooking, createBookingLoading, confirmReservation, confirmReservationLoading,
+    updateBooking, updateBookingLoading
   } = useBooking(bookingId, targetCarId, startDateTime, endDateTime, hasDates, changeCarDialog);
 
   // 🔥 Update targetCarId once booking data arrives
@@ -97,6 +98,25 @@ export const BookingContainer = () => {
       setTargetCarId(bookingData.car.id);
     }
   }, [bookingData]);
+
+  // 🔥 Populate dates from booking data when editing
+  useEffect(() => {
+    if (bookingData && bookingId) {
+      // Only populate if no URL params are present (editing existing booking)
+      const rawStart = searchParams.get('start');
+      const rawEnd = searchParams.get('end');
+      
+      if (!rawStart && !rawEnd && bookingData.startDate && bookingData.endDate) {
+        const start = new Date(bookingData.startDate);
+        const end = new Date(bookingData.endDate);
+        
+        setStartDate(start.toISOString().split('T')[0]);
+        setEndDate(end.toISOString().split('T')[0]);
+        setStartTime(bookingData.pickupTime || '10:00');
+        setEndTime(bookingData.returnTime || '10:00');
+      }
+    }
+  }, [bookingData, bookingId, searchParams]);
 
   useEffect(() => {
     if (availabilityData?.checkCarAvailability) setIsCarAvailable(availabilityData.checkCarAvailability.available);
@@ -134,14 +154,32 @@ export const BookingContainer = () => {
 
   const handleConfirmAction = async () => {
     try {
-      let bId = bookingId;
-      if (!bId) {
+      if (bookingId) {
+        // Modify booking flow - update existing booking
+        await updateBooking({ 
+          variables: { 
+            id: bookingId, 
+            input: { 
+              startDate: new Date(startDateTime).toISOString(), 
+              endDate: new Date(endDateTime).toISOString(), 
+              pickupTime: startTime, 
+              returnTime: endTime,
+              basePrice: priceDetails?.basePrice,
+              taxAmount: priceDetails?.taxAmount, 
+              totalPrice: priceDetails?.totalPrice
+            } 
+          } 
+        });
+        // Redirect to booking records after successful update
+        router.push('/bookingRecords');
+      } else {
+        // New booking flow
         const { data: bRes } = await createBooking({ variables: { input: { carId: targetCarId, startDate: new Date(startDateTime).toISOString(), endDate: new Date(endDateTime).toISOString(), pickupTime: startTime, returnTime: endTime, basePrice: priceDetails?.basePrice, taxAmount: priceDetails?.taxAmount, totalPrice: priceDetails?.totalPrice, depositAmount: priceDetails?.deposit, bookingType: 'RENTAL' } } });
-        bId = bRes.createBooking.id;
+        const bId = bRes.createBooking.id;
+        const { data: confirmData } = await confirmReservation({ variables: { id: bId } });
+        setConfirmedBookingData(confirmData.confirmReservation);
+        setEmailVerificationPopup(true);
       }
-      const { data: confirmData } = await confirmReservation({ variables: { id: bId } });
-      setConfirmedBookingData(confirmData.confirmReservation);
-      setEmailVerificationPopup(true);
     } catch (e: any) { alert(e.message); }
   };
 

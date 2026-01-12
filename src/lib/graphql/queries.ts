@@ -60,6 +60,13 @@ export const GET_MY_BOOKINGS_QUERY = gql`
       status
       bookingType
       repairOrderId
+      verification {
+        id
+        token
+        expiresAt
+        isVerified
+        verifiedAt
+      }
       car {
         brand { name }
         model { name }
@@ -96,6 +103,13 @@ export const GET_ALL_BOOKINGS_QUERY = gql`
       bookingType
       repairOrderId
       createdAt
+      verification {
+        id
+        token
+        expiresAt
+        isVerified
+        verifiedAt
+      }
       user {
         id
         fullName
@@ -318,8 +332,8 @@ export const GET_BOOKING_QUERY = gql`
 `;
 
 export const CHECK_CAR_AVAILABILITY_QUERY = gql`
-  query CheckCarAvailability($carId: ID!, $startDate: String!, $endDate: String!) {
-    checkCarAvailability(carId: $carId, startDate: $startDate, endDate: $endDate) {
+  query CheckCarAvailability($carId: ID!, $startDate: String!, $endDate: String!, $excludeBookingId: ID) {
+    checkCarAvailability(carId: $carId, startDate: $startDate, endDate: $endDate, excludeBookingId: $excludeBookingId) {
       available
       conflictingBookings {
         id

@@ -30,6 +30,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={roboto.variable}>
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#0F172A" />
+      </head>
       <body style={{ margin: 0, padding: 0 }}>
         <Providers>
           {children}

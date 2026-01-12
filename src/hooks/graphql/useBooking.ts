@@ -9,7 +9,8 @@ import {
 } from '@/lib/graphql/queries';
 import { 
   CREATE_BOOKING_MUTATION, 
-  CONFIRM_RESERVATION_MUTATION 
+  CONFIRM_RESERVATION_MUTATION,
+  UPDATE_BOOKING_MUTATION 
 } from '@/lib/graphql/mutations';
 
 export const useBooking = (bookingId: string | null, carQueryId: string | null, startISO: string, endISO: string, hasDates: boolean, changeCarOpen: boolean) => {
@@ -35,7 +36,8 @@ export const useBooking = (bookingId: string | null, carQueryId: string | null, 
     variables: {
       carId: carQueryId,
       startDate: startISO || new Date().toISOString(),
-      endDate: endISO || new Date().toISOString()
+      endDate: endISO || new Date().toISOString(),
+      excludeBookingId: bookingId // Pass bookingId to exclude current booking when editing
     },
     skip: !carQueryId || !hasDates,
     fetchPolicy: 'network-only'
@@ -53,6 +55,7 @@ export const useBooking = (bookingId: string | null, carQueryId: string | null, 
 
   const [createBooking, { loading: createBookingLoading }] = useMutation(CREATE_BOOKING_MUTATION);
   const [confirmReservation, { loading: confirmReservationLoading }] = useMutation(CONFIRM_RESERVATION_MUTATION);
+  const [updateBooking, { loading: updateBookingLoading }] = useMutation(UPDATE_BOOKING_MUTATION);
 
   return {
     userData, platformData, 
@@ -61,6 +64,7 @@ export const useBooking = (bookingId: string | null, carQueryId: string | null, 
     availabilityData, checkingAvailability,
     availableCarsData, availableCarsLoading,
     createBooking, createBookingLoading,
-    confirmReservation, confirmReservationLoading
+    confirmReservation, confirmReservationLoading,
+    updateBooking, updateBookingLoading
   };
 };

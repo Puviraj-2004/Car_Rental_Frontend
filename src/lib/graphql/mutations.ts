@@ -182,7 +182,7 @@ export const CONFIRM_RESERVATION_MUTATION = gql`
 `;
 
 export const CONFIRM_BOOKING_MUTATION = gql`
-  mutation ConfirmBooking($bookingId: ID!) {
+  mutation ConfirmBooking($bookingId: String!) {
     confirmBooking(bookingId: $bookingId) {
       success
       message
@@ -204,7 +204,7 @@ export const CONFIRM_BOOKING_MUTATION = gql`
 `;
 
 export const RESEND_VERIFICATION_LINK_MUTATION = gql`
-  mutation ResendVerificationLink($bookingId: ID!) {
+  mutation ResendVerificationLink($bookingId: String!) {
     resendVerificationLink(bookingId: $bookingId) {
       success
       message
@@ -233,7 +233,7 @@ export const CREATE_OR_UPDATE_VERIFICATION_MUTATION = gql`
 `;
 
 export const CREATE_STRIPE_CHECKOUT_SESSION_MUTATION = gql`
-  mutation CreateStripeCheckoutSession($bookingId: ID!) {
+  mutation CreateStripeCheckoutSession($bookingId: String!) {
     createStripeCheckoutSession(bookingId: $bookingId) {
       url
       sessionId
@@ -242,7 +242,7 @@ export const CREATE_STRIPE_CHECKOUT_SESSION_MUTATION = gql`
 `;
 
 export const MOCK_FINALIZE_PAYMENT_MUTATION = gql`
-  mutation MockFinalizePayment($bookingId: ID!, $success: Boolean!) {
+  mutation MockFinalizePayment($bookingId: String!, $success: Boolean!) {
     mockFinalizePayment(bookingId: $bookingId, success: $success) {
       id
       status
@@ -256,7 +256,7 @@ export const MOCK_FINALIZE_PAYMENT_MUTATION = gql`
 `;
 
 export const SEND_VERIFICATION_LINK_MUTATION = gql`
-  mutation SendBookingVerificationLink($bookingId: ID!) {
+  mutation SendBookingVerificationLink($bookingId: String!) {
     sendBookingVerificationLink(bookingId: $bookingId) {
       success
       message
@@ -270,6 +270,39 @@ export const VERIFY_BOOKING_TOKEN_MUTATION = gql`
       success
       message
       bookingId
+    }
+  }
+`;
+
+export const UPDATE_BOOKING_MUTATION = gql`
+  mutation UpdateBooking($id: ID!, $input: UpdateBookingInput!) {
+    updateBooking(id: $id, input: $input) {
+      id
+      startDate
+      endDate
+      pickupTime
+      returnTime
+      status
+      basePrice
+      taxAmount
+      totalPrice
+      car {
+        id
+        brand { name }
+        model { name }
+        plateNumber
+        fuelType
+        transmission
+        requiredLicense
+        dailyKmLimit
+        extraKmCharge
+        pricePerDay
+        depositAmount
+        images {
+          url
+          isPrimary
+        }
+      }
     }
   }
 `;
@@ -312,7 +345,7 @@ export const PROCESS_DOCUMENT_OCR_MUTATION = gql`
 // --- 📏 METER TRACKING & KM MANAGEMENT ---
 
 export const UPDATE_METER_READINGS_MUTATION = gql`
-  mutation UpdateMeterReadings($bookingId: ID!, $input: UpdateMeterReadingInput!) {
+  mutation UpdateMeterReadings($bookingId: String!, $input: UpdateMeterReadingInput!) {
     updateMeterReadings(bookingId: $bookingId, input: $input) {
       id
       startMeter
@@ -323,7 +356,7 @@ export const UPDATE_METER_READINGS_MUTATION = gql`
 `;
 
 export const FINALIZE_BOOKING_RETURN_MUTATION = gql`
-  mutation FinalizeBookingReturn($bookingId: ID!) {
+  mutation FinalizeBookingReturn($bookingId: String!) {
     finalizeBookingReturn(bookingId: $bookingId) {
       id
       endMeter
@@ -421,7 +454,7 @@ export const DELETE_USER_MUTATION = gql`
 `;
 
 export const START_TRIP_MUTATION = gql`
-  mutation StartTrip($bookingId: ID!) {
+  mutation StartTrip($bookingId: String!) {
     startTrip(bookingId: $bookingId) {
       id
       status
@@ -434,7 +467,7 @@ export const START_TRIP_MUTATION = gql`
 `;
 
 export const COMPLETE_TRIP_MUTATION = gql`
-  mutation CompleteTrip($bookingId: ID!) {
+  mutation CompleteTrip($bookingId: String!) {
     completeTrip(bookingId: $bookingId) {
       id
       status

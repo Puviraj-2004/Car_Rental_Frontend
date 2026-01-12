@@ -19,7 +19,7 @@ import {
 } from '@mui/icons-material';
 
 export const VerificationView = ({
-  currentStep, setCurrentStep, activeScanning, isSuccess, device,
+  currentStep, setCurrentStep, activeScanning, isSuccess, device, onNext,
   previews, licenseData, setLicenseData, cniData, setCniData,
   addressData, setAddressData, handleFileUpload, handleSubmit,
   isLicenseComplete, isCniComplete, isAddressComplete, isLoading
@@ -122,7 +122,7 @@ export const VerificationView = ({
                   </Box>
                 </Stack>
                 <Box mt={5} textAlign="right">
-                  <Button variant="contained" size="large" onClick={() => setCurrentStep(1)} disabled={!isLicenseComplete || !!activeScanning} sx={{ px: 6, py: 1.5, borderRadius: 3, bgcolor: '#0F172A' }}>Next Step</Button>
+                  <Button variant="contained" size="large" onClick={onNext} disabled={!isLicenseComplete || !!activeScanning} sx={{ px: 6, py: 1.5, borderRadius: 3, bgcolor: '#0F172A' }}>Next Step</Button>
                 </Box>
               </Card>
             </motion.div>
@@ -142,7 +142,7 @@ export const VerificationView = ({
                 </Stack>
                 <Box mt={5} display="flex" justifyContent="space-between">
                   <Button onClick={() => setCurrentStep(0)} variant="outlined">Previous</Button>
-                  <Button variant="contained" size="large" onClick={() => setCurrentStep(2)} disabled={!isCniComplete || !!activeScanning} sx={{ px: 6, py: 1.5, borderRadius: 3, bgcolor: '#0F172A' }}>Next Step</Button>
+                  <Button variant="contained" size="large" onClick={onNext} disabled={!isCniComplete || !!activeScanning} sx={{ px: 6, py: 1.5, borderRadius: 3, bgcolor: '#0F172A' }}>Next Step</Button>
                 </Box>
               </Card>
             </motion.div>

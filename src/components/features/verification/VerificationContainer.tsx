@@ -5,7 +5,7 @@ import { useVerification } from '@/hooks/graphql/useVerification';
 import { VerificationView } from './VerificationView';
 
 export const VerificationContainer = ({ token }: { token: string }) => {
-  const { processOCR, updateProfile } = useVerification(token);
+  const { processOCR, updateProfile, bookingData } = useVerification(token);
 
   // States
   const [currentStep, setCurrentStep] = useState(0);
@@ -88,7 +88,17 @@ export const VerificationContainer = ({ token }: { token: string }) => {
     finally { setActiveScanning(null); }
   };
 
+  
+
+  
+
   const handleSubmit = async () => {
+    // Final validation for address
+    if (!addressData.address) {
+      alert('Address is required.');
+      return;
+    }
+
     try {
       await updateProfile({
         variables: {
@@ -109,10 +119,78 @@ export const VerificationContainer = ({ token }: { token: string }) => {
     } catch (e) { alert("Verification failed. Please try again."); }
   };
 
+    const handleNext = () => {
+    const returnDate = bookingData?.bookingByToken?.endDate;
+    const youngDriverMinAge = 25; // Default, could fetch from settings
+
+    if (currentStep === 0) {
+      // Step 1: Licence check - Expiry date > return date and check required licence category
+      if (!licenseData.expiry) {
+        alert('License expiry date is required.');
+        return;
+      }
+      const expiry = new Date(licenseData.expiry);
+      const retDate = new Date(returnDate);
+      if (expiry <= retDate) {
+        alert('License expiry date must be greater than the return date.');
+        return;
+      }
+
+      const requiredCategory = bookingData?.bookingByToken?.car?.licenseCategory || 'B';
+      const userCategories = licenseData.categories || [];
+      const hasValidCategory = userCategories.some((cat: string) =>
+        cat.trim().toUpperCase() === requiredCategory.trim().toUpperCase()
+      );
+      if (!hasValidCategory) {
+        alert(`This car requires a '${requiredCategory}' license. Your uploaded license does not match.`);
+        return;
+      }
+    } else if (currentStep === 1) {
+      // Step 2: Check expiry date, user matches licence, age for younger driver verification
+      if (!licenseData.expiry) {
+        alert('License expiry date is required.');
+        return;
+      }
+      const expiry = new Date(licenseData.expiry);
+      const now = new Date();
+      if (expiry <= now) {
+        alert('License has expired.');
+        return;
+      }
+
+      if (licenseData.name !== cniData.name) {
+        alert('Name on license does not match name on ID card.');
+        return;
+      }
+
+      if (!cniData.dob) {
+        alert('Birth date is required.');
+        return;
+      }
+      const birthDate = new Date(cniData.dob);
+      const age = now.getFullYear() - birthDate.getFullYear();
+      if (age < youngDriverMinAge) {
+        alert(`You must be at least ${youngDriverMinAge} years old to rent this car.`);
+        return;
+      }
+    } else if (currentStep === 2) {
+      // Step 3: Check document date between 3 months ago and fill the address
+      if (!addressData.address) {
+        alert('Address is required.');
+        return;
+      }
+      // Assume document date is current, or if OCR had date, check it
+      // For now, skip date check as OCR doesn't provide it
+    }
+
+    setCurrentStep((prev) => prev + 1);
+  };
+
   return (
     <VerificationView
       currentStep={currentStep} setCurrentStep={setCurrentStep}
       activeScanning={activeScanning} isSuccess={isSuccess} device={device}
+      onNext={handleNext}
       previews={previews} licenseData={licenseData} setLicenseData={setLicenseData}
       cniData={cniData} setCniData={setCniData} addressData={addressData}
       setAddressData={setAddressData} handleFileUpload={handleFileUpload}

@@ -252,8 +252,13 @@ export const BookingRecordsView = ({
               {/* PAYMENT & STATUS SUMMARY */}
               <Box display="flex" justifyContent="space-between" alignItems="center">
                 <Box>
-                   <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ letterSpacing: 1 }}>GRAND TOTAL</Typography>
+                   <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ letterSpacing: 1 }}>RENTAL TOTAL</Typography>
                    <Typography variant="h4" fontWeight={1000} color="primary.main">€{selectedBooking.totalPrice?.toFixed(2)}</Typography>
+                   {selectedBooking.depositAmount > 0 && (
+                     <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                       + €{selectedBooking.depositAmount?.toFixed(2)} security deposit
+                     </Typography>
+                   )}
                 </Box>
                 <Stack alignItems="flex-end">
                    <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ mb: 1 }}>STATUS</Typography>
