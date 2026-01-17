@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Container, Typography, Paper, Alert, CircularProgress, Box, Stack, Divider } from '@mui/material';
+import { Container, Typography, Paper, Alert, CircularProgress, Box, Stack, Divider, Button } from '@mui/material';
 
 interface PaymentViewProps {
   status: string;
@@ -9,16 +9,17 @@ interface PaymentViewProps {
   error: any;
   booking: any;
   bookingId: string;
+  onProceed?: () => void;
 }
 
-export const PaymentView = ({ status, loading, error, booking, bookingId }: PaymentViewProps) => {
-  // Loading or Auth checking state
+export const PaymentView = ({ status, loading, error, booking, bookingId, onProceed }: PaymentViewProps) => {
+  // Loading State
   if (status === 'loading' || loading) {
     return (
       <Container maxWidth="sm" sx={{ py: 12, textAlign: 'center' }}>
         <CircularProgress size={40} sx={{ color: '#0F172A' }} />
         <Typography variant="body1" sx={{ mt: 3, color: '#64748B', fontWeight: 500 }}>
-          Initializing secure payment gateway...
+          Connecting to secure payment gateway...
         </Typography>
       </Container>
     );
@@ -44,13 +45,14 @@ export const PaymentView = ({ status, loading, error, booking, bookingId }: Paym
     );
   }
 
-  // Warning: Status Mismatch
+  // Warning: Status Mismatch (If user manually navigates here)
   if (booking.status !== 'VERIFIED') {
     return (
       <Container maxWidth="sm" sx={{ py: 8 }}>
         <Alert severity="warning" variant="outlined" sx={{ borderRadius: 3, bgcolor: '#FFF' }}>
-          <Typography fontWeight={700}>Payment Not Ready</Typography>
-          This booking is in <b>{booking.status}</b> status. Payment is only available for VERIFIED bookings.
+          <Typography fontWeight={700}>Payment Not Required</Typography>
+          This booking is currently <b>{booking.status}</b>. 
+          {booking.status === 'CONFIRMED' ? ' Payment has already been received.' : ' Please wait for verification.'}
         </Alert>
       </Container>
     );
@@ -76,10 +78,10 @@ export const PaymentView = ({ status, loading, error, booking, bookingId }: Paym
           
           <Box>
             <Typography variant="h5" fontWeight={900} color="#0F172A" gutterBottom>
-              Redirecting to Secure Payment
+              Redirecting to Stripe
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Please do not refresh the page or click the back button.
+              You are being securely redirected to complete your payment.
             </Typography>
           </Box>
 
@@ -96,8 +98,16 @@ export const PaymentView = ({ status, loading, error, booking, bookingId }: Paym
              </Stack>
           </Box>
 
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ color: '#10B981', opacity: 0.8 }}>
-            <Typography variant="caption" fontWeight={700}>SSL ENCRYPTED SECURE PAYMENT</Typography>
+          <Stack spacing={2} sx={{ width: '100%' }}>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ color: '#10B981', opacity: 0.8 }}>
+              <Typography variant="caption" fontWeight={700}>SSL ENCRYPTED SECURE PAYMENT</Typography>
+            </Stack>
+            <Box>
+              <Button fullWidth variant="contained" onClick={onProceed} disabled={!onProceed} sx={{ py: 1.5, borderRadius: 3, fontWeight: 800, bgcolor: '#0F172A', '&:hover': { bgcolor: '#1E293B' } }}>Proceed to Payment</Button>
+              {error && (
+                <Alert severity="error" sx={{ mt: 2 }}>{error.message || 'Failed to initiate payment. Please try again.'}</Alert>
+              )}
+            </Box>
           </Stack>
         </Stack>
       </Paper>

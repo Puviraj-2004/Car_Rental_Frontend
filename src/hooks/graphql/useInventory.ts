@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from '@apollo/client';
-import { GET_BRANDS_QUERY, GET_MODELS_QUERY } from '@/lib/graphql/queries';
+import { GET_BRANDS_QUERY, GET_MODELS_QUERY, GET_MODELS_BY_BRAND_QUERY } from '@/lib/graphql/queries';
 import { 
   DELETE_BRAND_MUTATION, 
   UPDATE_BRAND_MUTATION, 
@@ -12,10 +12,13 @@ import {
 export const useInventory = (selectedBrandId: string, activeTab: number) => {
   const { data: brands, refetch: refetchBrands } = useQuery(GET_BRANDS_QUERY);
   
-  const { data: models, refetch: refetchModels, loading: modelsLoading } = useQuery(GET_MODELS_QUERY, {
-    variables: { brandId: selectedBrandId },
-    skip: !selectedBrandId && activeTab === 1
-  });
+// Use different query based on whether brand is selected
+const { data: models, refetch: refetchModels, loading: modelsLoading } = useQuery(
+  selectedBrandId ? GET_MODELS_BY_BRAND_QUERY : GET_MODELS_QUERY,
+  selectedBrandId 
+    ? { variables: { brandId: selectedBrandId }, skip: activeTab !== 1 }
+    : { skip: activeTab !== 1 }
+);
 
   const [deleteBrand] = useMutation(DELETE_BRAND_MUTATION);
   const [updateBrand] = useMutation(UPDATE_BRAND_MUTATION);

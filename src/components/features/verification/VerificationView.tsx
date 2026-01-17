@@ -3,8 +3,8 @@
 import React from 'react';
 import {
   Box, Button, Typography, Paper, Grid, TextField, 
-  Stepper, Step, StepLabel, CircularProgress, Card, Stack, Container, Chip, Alert,
-  FormGroup, FormControlLabel, Checkbox, Divider
+  Stepper, Step, StepLabel, Card, Stack, Container, Chip,
+  FormGroup, FormControlLabel, Checkbox, Snackbar, Alert as MuiAlert
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -22,7 +22,7 @@ export const VerificationView = ({
   currentStep, setCurrentStep, activeScanning, isSuccess, device, onNext,
   previews, licenseData, setLicenseData, cniData, setCniData,
   addressData, setAddressData, handleFileUpload, handleSubmit,
-  isLicenseComplete, isCniComplete, isAddressComplete, isLoading
+  isLicenseComplete, isCniComplete, isAddressComplete, alert, setAlert
 }: any) => {
 
   const ImageUploadBox = ({ label, preview, onUpload, isScanning, icon }: any) => (
@@ -49,9 +49,19 @@ export const VerificationView = ({
         </Button>
       )}
       {isScanning && (
-        <Box sx={{ position: 'absolute', inset: 0, bgcolor: 'rgba(124, 58, 237, 0.85)', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-          <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1.5, repeat: Infinity }}><AIScanIcon sx={{ fontSize: 50 }} /></motion.div>
-          <Typography variant="caption" fontWeight={900} sx={{ mt: 1 }}>AI SCANNING...</Typography>
+        <Box sx={{ position: 'absolute', inset: 0, bgcolor: 'rgba(124, 58, 237, 0.95)', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+          <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
+            <AIScanIcon sx={{ fontSize: 60 }} />
+          </motion.div>
+          <Typography variant="h6" fontWeight={900} sx={{ mt: 2 }}>AI is reading your document...</Typography>
+          <Typography variant="body2" sx={{ mt: 1, opacity: 0.8 }}>This usually takes 3-5 seconds</Typography>
+          <Box sx={{ mt: 2, width: '80%', height: 4, bgcolor: 'rgba(255,255,255,0.3)', borderRadius: 2, overflow: 'hidden' }}>
+            <motion.div 
+              animate={{ x: ['-100%', '100%'] }} 
+              transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+              style={{ width: '30%', height: '100%', backgroundColor: 'white', borderRadius: 2 }}
+            />
+          </Box>
         </Box>
       )}
     </Box>
@@ -62,10 +72,10 @@ export const VerificationView = ({
       <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#FFFFFF', textAlign: 'center', p: 3, position: 'fixed', inset: 0, zIndex: 9999 }}>
         <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
           <CheckCircleIcon sx={{ fontSize: 120, color: '#10B981', mb: 4 }} />
-          <Typography variant="h3" fontWeight={900} color="#0F172A" gutterBottom>Verification Successful</Typography>
-          <Typography variant="h6" color="text.secondary" mb={5}>Your identity has been confirmed. You may close this window.</Typography>
+          <Typography variant="h3" fontWeight={900} color="#0F172A" gutterBottom>Documents Submitted Successfully</Typography>
+          <Typography variant="h6" color="text.secondary" mb={5}>Your documents have been submitted successfully! They are now under review. You can proceed to payment while verification is pending.</Typography>
           <Paper elevation={0} sx={{ p: 4, bgcolor: '#F0FDF4', borderRadius: 6, border: '2px solid #BBF7D0', maxWidth: 500, mx: 'auto' }}>
-            <Typography variant="h5" color="#15803D" fontWeight={800}>Please return to your primary device to complete payment.</Typography>
+            <Typography variant="h5" color="#15803D" fontWeight={800}>Next Step: Complete Payment</Typography>
           </Paper>
         </motion.div>
       </Box>
@@ -91,6 +101,8 @@ export const VerificationView = ({
         </Paper>
 
         <AnimatePresence mode="wait">
+          
+          {/* STEP 1: LICENSE */}
           {currentStep === 0 && (
             <motion.div key="s1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <Card sx={{ p: 5, borderRadius: 6, border: '1px solid #E2E8F0' }}>
@@ -107,7 +119,9 @@ export const VerificationView = ({
                   <TextField label="Full Name" fullWidth value={licenseData.name} onChange={e => setLicenseData({...licenseData, name: e.target.value})}/>
                   <Grid container spacing={2}>
                     <Grid item xs={12} sm={6}><TextField label="License Number" fullWidth value={licenseData.number} onChange={e => setLicenseData({...licenseData, number: e.target.value})}/></Grid>
-                    <Grid item xs={12} sm={6}><TextField label="Expiry Date" fullWidth placeholder="YYYY-MM-DD" value={licenseData.expiry} onChange={e => setLicenseData({...licenseData, expiry: e.target.value})}/></Grid>
+                    <Grid item xs={12} sm={6}><TextField label="Expiry Date" type="date" fullWidth InputLabelProps={{ shrink: true }} value={licenseData.expiry} onChange={e => setLicenseData({...licenseData, expiry: e.target.value})}/></Grid>
+                    <Grid item xs={12} sm={6}><TextField label="Date of Birth" type="date" fullWidth InputLabelProps={{ shrink: true }} value={licenseData.dob} onChange={e => setLicenseData({...licenseData, dob: e.target.value})}/></Grid>
+                    <Grid item xs={12} sm={6}><TextField label="Issue Date" type="date" fullWidth InputLabelProps={{ shrink: true }} value={licenseData.issueDate} onChange={e => setLicenseData({...licenseData, issueDate: e.target.value})}/></Grid>
                   </Grid>
                   <Box>
                     <Typography variant="caption" fontWeight={700} color="text.secondary">LICENSE CATEGORIES</Typography>
@@ -128,16 +142,25 @@ export const VerificationView = ({
             </motion.div>
           )}
 
+          {/* STEP 2: ID CARD */}
           {currentStep === 1 && (
             <motion.div key="s2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <Card sx={{ p: 5, borderRadius: 6, border: '1px solid #E2E8F0' }}>
                 <Typography variant="h6" fontWeight={800} mb={3}>Step 2: National ID Card</Typography>
-                <ImageUploadBox label="Upload ID Card" preview={previews.cni} isScanning={activeScanning === 'ID_CARD'} onUpload={(f: any) => handleFileUpload(f, 'ID_CARD')} icon={<CloudUploadIcon sx={{ fontSize: 40 }} />} />
+                <Grid container spacing={3}>
+                  <Grid item xs={12} sm={6}>
+                    <ImageUploadBox label="Upload Front" preview={previews.cni} isScanning={activeScanning === 'ID_CARD'} onUpload={(f: any) => handleFileUpload(f, 'ID_CARD')} icon={<CloudUploadIcon sx={{ fontSize: 40 }} />} />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <ImageUploadBox label="Upload Back" preview={previews.cniBack} isScanning={activeScanning === 'ID_CARD_BACK'} onUpload={(f: any) => handleFileUpload(f, 'ID_CARD', 'BACK')} icon={<CloudUploadIcon sx={{ fontSize: 40 }} />} />
+                  </Grid>
+                </Grid>
                 <Stack spacing={3} mt={4}>
                   <TextField label="ID Card Name" fullWidth value={cniData.name} onChange={e => setCniData({...cniData, name: e.target.value})}/>
                   <Grid container spacing={2}>
                     <Grid item xs={12} sm={6}><TextField label="ID Card Number" fullWidth value={cniData.number} onChange={e => setCniData({...cniData, number: e.target.value})}/></Grid>
-                    <Grid item xs={12} sm={6}><TextField label="Birth Date" fullWidth placeholder="YYYY-MM-DD" value={cniData.dob} onChange={e => setCniData({...cniData, dob: e.target.value})}/></Grid>
+                    <Grid item xs={12} sm={6}><TextField label="Date of Birth" type="date" fullWidth InputLabelProps={{ shrink: true }} value={cniData.dob} onChange={e => setCniData({...cniData, dob: e.target.value})}/></Grid>
+                    <Grid item xs={12}><TextField label="ID Expiry Date" type="date" fullWidth InputLabelProps={{ shrink: true }} value={cniData.idExpiry} onChange={e => setCniData({...cniData, idExpiry: e.target.value})}/></Grid>
                   </Grid>
                 </Stack>
                 <Box mt={5} display="flex" justifyContent="space-between">
@@ -148,6 +171,7 @@ export const VerificationView = ({
             </motion.div>
           )}
 
+          {/* STEP 3: ADDRESS */}
           {currentStep === 2 && (
             <motion.div key="s3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
               <Card sx={{ p: 5, borderRadius: 6, border: '1px solid #E2E8F0' }}>
@@ -170,6 +194,22 @@ export const VerificationView = ({
           <Chip icon={<VerifiedUserIcon />} label="GDPR Compliant" variant="outlined" size="small" />
         </Stack>
       </Container>
+
+      {/* Alert Snackbar */}
+      <Snackbar 
+        open={alert.open} 
+        autoHideDuration={6000} 
+        onClose={() => setAlert({ ...alert, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <MuiAlert 
+          onClose={() => setAlert({ ...alert, open: false })} 
+          severity={alert.severity} 
+          sx={{ width: '100%' }}
+        >
+          {alert.message}
+        </MuiAlert>
+      </Snackbar>
     </Box>
   );
 };

@@ -5,7 +5,7 @@ import { CREATE_BOOKING_MUTATION } from '@/lib/graphql/mutations';
 export const useCars = (filterPayload: any, shouldSkip: boolean) => {
   const { data: carsData, loading: carsLoading, error: carsError } = useQuery(GET_CARS_QUERY, {
     variables: { filter: filterPayload },
-    fetchPolicy: 'cache-and-network',
+    fetchPolicy: 'cache-first',
     skip: shouldSkip 
   });
 

@@ -3,7 +3,8 @@ import {
   GET_CAR_QUERY, 
   GET_CAR_ENUMS, 
   GET_BRANDS_QUERY, 
-  GET_MODELS_QUERY, 
+  GET_MODELS_QUERY,
+  GET_MODELS_BY_BRAND_QUERY,
   GET_CARS_QUERY 
 } from '@/lib/graphql/queries';
 import { 
@@ -13,7 +14,7 @@ import {
   SET_PRIMARY_CAR_IMAGE_MUTATION 
 } from '@/lib/graphql/mutations';
 
-export const useEditCar = (carId: string, brandId: string) => {
+export const useEditCar = (carId: string , selectedBrandId: string) => {
   const { data: carData, loading: carLoading, error: carError } = useQuery(GET_CAR_QUERY, {
     variables: { id: carId },
     fetchPolicy: 'no-cache'
@@ -21,9 +22,10 @@ export const useEditCar = (carId: string, brandId: string) => {
   
   const { data: enumData } = useQuery(GET_CAR_ENUMS);
   const { data: brandData } = useQuery(GET_BRANDS_QUERY);
-  const { data: modelData } = useQuery(GET_MODELS_QUERY, {
-    variables: { brandId },
-    skip: !brandId,
+  
+  const { data: modelData } = useQuery(GET_MODELS_BY_BRAND_QUERY, {
+    variables: { brandId: selectedBrandId || carData?.car?.brand?.id || '' },
+    skip: !(selectedBrandId || carData?.car?.brand?.id),
   });
 
   const [updateCar] = useMutation(UPDATE_CAR_MUTATION, { refetchQueries: [{ query: GET_CARS_QUERY }] });

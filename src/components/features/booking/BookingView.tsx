@@ -1,16 +1,16 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import {
   Box, Container, Typography, Paper, Grid, Button, TextField,
   Card, Stack, Divider, Alert, CircularProgress, Chip, Dialog, 
-  DialogTitle, DialogContent, MenuItem, DialogActions, IconButton,
-  CardActionArea, Snackbar
+  DialogContent, MenuItem, IconButton, CardActionArea, Snackbar
 } from '@mui/material';
 import {
-  CheckCircle, Settings, LocalGasStation, ArrowBack, Edit, 
+  Settings, LocalGasStation, ArrowBack, Edit, 
   EventSeat, ContentCopy, CalendarMonth, LocationOn, Shield, 
-  WarningAmber, Close, AccessAlarm
+  Close, CheckCircle
 } from '@mui/icons-material';
 import QRCode from 'react-qr-code';
 
@@ -20,31 +20,31 @@ export const BookingView = ({
   checkingAvailability, isCarAvailable, hasDates, priceDetails, 
   platformData, createBookingLoading, confirmReservationLoading, updateBookingLoading,
   changeCarDialog, setChangeCarDialog, availableCarsLoading, availableCarsData, startDateTime, endDateTime,
-  emailVerificationPopup, confirmedBookingData, verificationTimer, copySuccess, handleCopyLink, onConfirmAction
+  emailVerificationPopup, confirmedBookingData, verificationTimer, copySuccess, handleCopyLink, onConfirmAction,
+  isEditMode // Received from container
  }: any) => {
-  // Determine back button destination dynamically
-  const getBackButtonInfo = () => {
-    if (typeof window !== 'undefined') {
-      const referrer = document.referrer;
-      const currentUrl = window.location.href;
-      
-      // Check if coming from booking records or has bookingId in URL
-      if (referrer.includes('/bookingRecords') || currentUrl.includes('bookingId=')) {
-        return { text: 'Back to Records', route: '/bookingRecords', isModifyMode: true };
-      }
-    }
-    return { text: 'Back to Fleet', route: '/cars', isModifyMode: false };
-  };
-  
-  const backButtonInfo = getBackButtonInfo();
+
+  // Logic based on isEditMode prop
+  const backButtonRoute = isEditMode ? '/bookingRecords' : '/cars';
+  const backButtonText = isEditMode ? 'Back to Records' : 'Back to Fleet';
+  const mainActionButtonText = isEditMode ? 'Update Booking' : 'Confirm Reservation';
+
   return (
     <Box sx={{ bgcolor: '#F8FAFC', minHeight: '100vh', pb: 12 }}>
       <Container maxWidth="xl" sx={{ }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
-          <Stack direction="row" alignItems="center" spacing={1} onClick={() => router.push(backButtonInfo.route)} sx={{ cursor: 'pointer', color: '#64748B' }}>
-            <ArrowBack fontSize="small" /> <Typography fontWeight={600}>{backButtonInfo.text}</Typography>
+          <Stack 
+            direction="row" 
+            alignItems="center" 
+            spacing={1} 
+            onClick={() => router.push(backButtonRoute)} 
+            sx={{ cursor: 'pointer', color: '#64748B' }}
+          >
+            <ArrowBack fontSize="small" /> <Typography fontWeight={600}>{backButtonText}</Typography>
           </Stack>
-          <Typography variant="h5" fontWeight={800} color="#0F172A">Secure Checkout</Typography>
+          <Typography variant="h5" fontWeight={800} color="#0F172A">
+            {isEditMode ? 'Modify Reservation' : 'Secure Checkout'}
+          </Typography>
           <Box width={50} />
         </Box>
 
@@ -95,9 +95,15 @@ export const BookingView = ({
                    <Button startIcon={<Edit />} size="small" onClick={() => setChangeCarDialog(true)} sx={{ color: '#7C3AED', fontWeight: 700 }}>Change</Button>
                 </Box>
                 <Grid container alignItems="center">
-                   <Grid item xs={12} md={5} sx={{ bgcolor: '#F8FAFC', p: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 220 }}>
-                      {/* ✅ FIXED: Added defensive check for car object */}
-                      <Box component="img" src={car?.images?.[0]?.url} sx={{ width: '100%', maxHeight: 180, objectFit: 'contain' }} />
+                   <Grid item xs={12} md={5} sx={{ bgcolor: '#F8FAFC', p: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 220, position: 'relative' }}>
+                      <Image 
+                        src={car?.images?.[0]?.url} 
+                        alt="car" 
+                        fill
+                        style={{ objectFit: 'contain' }}
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        priority={true}
+                      />
                    </Grid>
                    <Grid item xs={12} md={7} sx={{ p: 4 }}>
                       <Typography variant="overline" color="primary" fontWeight={800}>{car?.brand?.name}</Typography>
@@ -134,8 +140,15 @@ export const BookingView = ({
                          No charge now. Payment collected after verification.
                        </Typography>
                     </Box>
-                    <Button fullWidth variant="contained" size="large" onClick={onConfirmAction} disabled={!isCarAvailable || createBookingLoading || confirmReservationLoading || updateBookingLoading} sx={{ mt: 1, bgcolor: '#0F172A', py: 1.5, fontWeight: 800 }}>
-                      {backButtonInfo.isModifyMode ? 'Update Booking' : 'Confirm Reservation'}
+                    <Button 
+                      fullWidth 
+                      variant="contained" 
+                      size="large" 
+                      onClick={onConfirmAction} 
+                      disabled={!isCarAvailable || createBookingLoading || confirmReservationLoading || updateBookingLoading} 
+                      sx={{ mt: 1, bgcolor: '#0F172A', py: 1.5, fontWeight: 800 }}
+                    >
+                      {mainActionButtonText}
                     </Button>
                  </Stack>
                ) : (
@@ -159,7 +172,16 @@ export const BookingView = ({
                   <Grid item xs={12} sm={6} md={4} key={c.id}>
                      <Card variant="outlined" sx={{ borderRadius: 4 }} onClick={() => router.push(`/booking?carId=${c.id}&start=${startDateTime}&end=${endDateTime}`)}>
                         <CardActionArea sx={{ p: 2 }}>
-                          <Box sx={{ height: 140, display: 'flex', justifyContent: 'center' }}><img src={c.images?.[0]?.url} style={{ width: '100%', objectFit: 'contain' }} /></Box>
+                          <Box sx={{ height: 140, display: 'flex', justifyContent: 'center', position: 'relative' }}>
+                            <Image 
+                              src={c.images?.[0]?.url} 
+                              alt="car" 
+                              fill
+                              style={{ objectFit: 'contain' }}
+                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                              loading="lazy"
+                            />
+                          </Box>
                           <Typography fontWeight={900} mt={2}>{c.model.name}</Typography>
                           <Typography variant="h6" color="primary" fontWeight={800}>€{c.pricePerDay}/day</Typography>
                         </CardActionArea>

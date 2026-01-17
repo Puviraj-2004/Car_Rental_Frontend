@@ -16,6 +16,10 @@ export const BookingContainer = () => {
 
   const carId = searchParams.get('carId');
   const bookingId = searchParams.get('bookingId') || null;
+  
+  // Logic: If bookingId exists, we are in Edit Mode
+  const isEditMode = !!bookingId;
+
   const defaultDates = generateDefaultBookingDates();
 
   const [startDate, setStartDate] = useState(defaultDates.start.date);
@@ -92,14 +96,14 @@ export const BookingContainer = () => {
     updateBooking, updateBookingLoading
   } = useBooking(bookingId, targetCarId, startDateTime, endDateTime, hasDates, changeCarDialog);
 
-  // 🔥 Update targetCarId once booking data arrives
+  // Update targetCarId once booking data arrives
   useEffect(() => {
     if (bookingData?.car?.id) {
       setTargetCarId(bookingData.car.id);
     }
   }, [bookingData]);
 
-  // 🔥 Populate dates from booking data when editing
+  // Populate dates from booking data when editing
   useEffect(() => {
     if (bookingData && bookingId) {
       // Only populate if no URL params are present (editing existing booking)
@@ -139,7 +143,7 @@ export const BookingContainer = () => {
     return { durationLabel: `${diffDays} days`, basePrice, totalSurcharge: surcharge, taxAmount: tax, totalPrice: basePrice + tax + surcharge, deposit: carData.depositAmount };
   }, [carData, startDateTime, endDateTime, platformData, userData, hasDates]);
 
-  // Timer & Confirmation logic (Preserved)
+  // Timer & Confirmation logic
   useEffect(() => {
     if (!emailVerificationPopup || !confirmedBookingData?.verification?.expiresAt) return;
     const interval = setInterval(() => {
@@ -154,8 +158,8 @@ export const BookingContainer = () => {
 
   const handleConfirmAction = async () => {
     try {
-      if (bookingId) {
-        // Modify booking flow - update existing booking
+      if (isEditMode && bookingId) {
+        // UPDATE EXISTING BOOKING
         await updateBooking({ 
           variables: { 
             id: bookingId, 
@@ -173,7 +177,7 @@ export const BookingContainer = () => {
         // Redirect to booking records after successful update
         router.push('/bookingRecords');
       } else {
-        // New booking flow
+        // CREATE NEW BOOKING
         const { data: bRes } = await createBooking({ variables: { input: { carId: targetCarId, startDate: new Date(startDateTime).toISOString(), endDate: new Date(endDateTime).toISOString(), pickupTime: startTime, returnTime: endTime, basePrice: priceDetails?.basePrice, taxAmount: priceDetails?.taxAmount, totalPrice: priceDetails?.totalPrice, depositAmount: priceDetails?.deposit, bookingType: 'RENTAL' } } });
         const bId = bRes.createBooking.id;
         const { data: confirmData } = await confirmReservation({ variables: { id: bId } });
@@ -191,7 +195,6 @@ export const BookingContainer = () => {
     }
   };
 
-  // 🛡️ Senior Logic: Handle Errors instead of infinite loading
   if (bookingError || carError) {
     return (
       <Container maxWidth="sm" sx={{ py: 10, textAlign: 'center' }}>
@@ -203,7 +206,6 @@ export const BookingContainer = () => {
     );
   }
 
-  // Loading state
   if (status === 'loading' || bookingLoading || carLoading) {
     return (
       <Box sx={{ minHeight: '80vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
@@ -215,18 +217,39 @@ export const BookingContainer = () => {
 
   return (
     <BookingView 
-      router={router} car={carData} startDate={startDate} setStartDate={setStartDate} 
-      startTime={startTime} setStartTime={setStartTime} endDate={endDate} setEndDate={setEndDate} 
-      endTime={endTime} setEndTime={setEndTime} generateTimeOptions={generateTimeOptions} 
-      getMinPickupDate={getMinPickupDate} checkingAvailability={checkingAvailability} 
-      isCarAvailable={isCarAvailable} hasDates={hasDates} priceDetails={priceDetails} 
-      platformData={platformData} createBookingLoading={createBookingLoading} 
-      confirmReservationLoading={confirmReservationLoading} changeCarDialog={changeCarDialog} 
-      setChangeCarDialog={setChangeCarDialog} availableCarsLoading={availableCarsLoading} 
-      availableCarsData={availableCarsData} startDateTime={startDateTime} endDateTime={endDateTime}
-      emailVerificationPopup={emailVerificationPopup} confirmedBookingData={confirmedBookingData} 
-      verificationTimer={verificationTimer} copySuccess={copySuccess} handleCopyLink={handleCopyLink} 
+      router={router} 
+      car={carData} 
+      startDate={startDate} 
+      setStartDate={setStartDate} 
+      startTime={startTime} 
+      setStartTime={setStartTime} 
+      endDate={endDate} 
+      setEndDate={setEndDate} 
+      endTime={endTime} 
+      setEndTime={setEndTime} 
+      generateTimeOptions={generateTimeOptions} 
+      getMinPickupDate={getMinPickupDate} 
+      checkingAvailability={checkingAvailability} 
+      isCarAvailable={isCarAvailable} 
+      hasDates={hasDates} 
+      priceDetails={priceDetails} 
+      platformData={platformData} 
+      createBookingLoading={createBookingLoading} 
+      confirmReservationLoading={confirmReservationLoading} 
+      changeCarDialog={changeCarDialog} 
+      setChangeCarDialog={setChangeCarDialog} 
+      availableCarsLoading={availableCarsLoading} 
+      availableCarsData={availableCarsData} 
+      startDateTime={startDateTime} 
+      endDateTime={endDateTime}
+      emailVerificationPopup={emailVerificationPopup} 
+      confirmedBookingData={confirmedBookingData} 
+      verificationTimer={verificationTimer} 
+      copySuccess={copySuccess} 
+      handleCopyLink={handleCopyLink} 
       onConfirmAction={handleConfirmAction}
+      isEditMode={isEditMode} 
+      updateBookingLoading={updateBookingLoading}
     />
   );
 };

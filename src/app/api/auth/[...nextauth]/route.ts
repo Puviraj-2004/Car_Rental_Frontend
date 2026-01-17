@@ -16,7 +16,7 @@ const handler = NextAuth({
       },
       async authorize(credentials) {
         try {
-          // ⚠️ API URL சரியாக இருப்பதை உறுதி செய்யவும்
+          // ⚠️ Ensure API URL is correct
           const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/graphql";
           
           const res = await fetch(apiUrl, {

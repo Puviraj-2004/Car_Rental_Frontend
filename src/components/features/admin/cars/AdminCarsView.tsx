@@ -1,10 +1,11 @@
 'use client';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
 import {
   Box, Typography, Paper, Button, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, IconButton, Dialog,
-  DialogTitle, DialogActions, Chip, Grid, Card, CardMedia, CardContent,
+  TableContainer, TableHead, TableRow, IconButton, 
+  Chip, Grid, Card, CardMedia, CardContent,
   ToggleButtonGroup, ToggleButton, Stack, Avatar, Divider, alpha,
   LinearProgress, Autocomplete, TextField, MenuItem
 } from '@mui/material';
@@ -15,6 +16,89 @@ import {
   Clear as ClearIcon, EvStation as FuelIcon,
   FilterList as FilterIcon
 } from '@mui/icons-material';
+
+// Dynamically import Dialog to reduce bundle size
+const Dialog = dynamic(() => import('@mui/material/Dialog'), { ssr: false });
+const DialogTitle = dynamic(() => import('@mui/material/DialogTitle'), { ssr: false });
+const DialogActions = dynamic(() => import('@mui/material/DialogActions'), { ssr: false });
+
+/**
+ * UPDATED: CarImage Component
+ * Handles square, landscape, and portrait images gracefully.
+ */
+const CarImage = ({ src, alt, size = 'medium' }: { src?: string; alt: string; size?: 'small' | 'medium' | 'large' }) => {
+  const [loaded, setLoaded] = React.useState(false);
+  const [error, setError] = React.useState(false);
+
+  const sizeMap = {
+    small: { width: 60, borderRadius: 1.5, aspectRatio: '4/3', padding: '2px' },
+    medium: { width: '100%', borderRadius: 4, aspectRatio: '16/10', padding: '12px' },
+    large: { width: '100%', borderRadius: 4, aspectRatio: '16/9', padding: '20px' }
+  };
+
+  const currentSize = sizeMap[size];
+
+  return (
+    <Box
+      sx={{
+        position: 'relative',
+        width: currentSize.width,
+        aspectRatio: currentSize.aspectRatio,
+        bgcolor: '#F8FAFC', // Light studio background
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: currentSize.borderRadius,
+        overflow: 'hidden',
+        border: '1px solid #E2E8F0',
+        p: currentSize.padding // Car border-la ottama iruka padding
+      }}
+    >
+      {!loaded && !error && (
+        <Box sx={{ 
+          position: 'absolute', 
+          inset: 0, 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          bgcolor: '#F1F5F9'
+        }}>
+          <CarIcon sx={{ fontSize: size === 'small' ? 20 : 40, color: '#94A3B8' }} />
+        </Box>
+      )}
+      
+      {error ? (
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          color: '#94A3B8'
+        }}>
+          <CarIcon sx={{ fontSize: size === 'small' ? 20 : 40, mb: 0.5 }} />
+          <Typography variant="caption" sx={{ fontSize: '0.65rem', fontWeight: 600 }}>No Image</Typography>
+        </Box>
+      ) : (
+        <img
+          src={src}
+          alt={alt}
+          loading="lazy"
+          onLoad={() => setLoaded(true)}
+          onError={() => setError(true)}
+          style={{
+            width: '100%',
+            height: '100%',
+            // 'contain' ensures the car is never cropped, even if the image is square
+            objectFit: 'contain', 
+            objectPosition: 'center',
+            opacity: loaded ? 1 : 0,
+            transition: 'opacity 0.3s ease-in-out'
+          }}
+        />
+      )}
+    </Box>
+  );
+};
 
 export const AdminCarsView = ({
   cars, brands, models, enums, filters, setFilters, resetFilters,
@@ -27,7 +111,6 @@ export const AdminCarsView = ({
     return text.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
   };
 
-  // Logic check for active filter state
   const hasActiveFilters = 
     filters.brandIds.length > 0 || 
     filters.modelIds.length > 0 || 
@@ -75,7 +158,7 @@ export const AdminCarsView = ({
         </Stack>
       </Stack>
 
-      {/* 🔍 COMPACT SINGLE-SELECT FILTER BAR */}
+      {/* 🔍 FILTER BAR */}
       <Paper 
         elevation={0} 
         sx={{ 
@@ -87,7 +170,6 @@ export const AdminCarsView = ({
         }}
       >
         <Grid container spacing={2} alignItems="center">
-          {/* Brand Selection */}
           <Grid item xs={12} sm={6} md={2.5}>
             <Autocomplete
               size="small"
@@ -103,7 +185,6 @@ export const AdminCarsView = ({
             />
           </Grid>
 
-          {/* Model Selection */}
           <Grid item xs={12} sm={6} md={2.5}>
             <Autocomplete
               size="small"
@@ -120,7 +201,6 @@ export const AdminCarsView = ({
             />
           </Grid>
 
-          {/* Fuel Type */}
           <Grid item xs={12} sm={6} md={2}>
             <TextField
               select
@@ -137,7 +217,6 @@ export const AdminCarsView = ({
             </TextField>
           </Grid>
 
-          {/* Status Selection */}
           <Grid item xs={12} sm={6} md={2}>
             <TextField
               select
@@ -154,7 +233,6 @@ export const AdminCarsView = ({
             </TextField>
           </Grid>
 
-          {/* Clear Filters */}
           <Grid item xs={12} md={2.5} sx={{ textAlign: 'right' }}>
             <Button 
               fullWidth
@@ -177,27 +255,33 @@ export const AdminCarsView = ({
           {cars.map((car: any) => (
             <Grid item xs={12} sm={6} lg={4} key={car.id}>
               <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid #E2E8F0', overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column', transition: '0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 12px 24px -10px rgba(0,0,0,0.1)' } }}>
-                <Box sx={{ position: 'relative', height: 200, bgcolor: '#F8FAFC', display: 'flex', alignItems: 'center', p: 2 }}>
-                  <CardMedia component="img" image={car.images?.[0]?.url || ''} sx={{ objectFit: 'contain', height: '100%' }} />
+                <Box sx={{ p: 1.5, pb: 0 }}>
+                   {/* Car Image Box */}
+                  <CarImage src={car.images?.[0]?.url} alt={`${car.brand.name} ${car.model.name}`} size="medium" />
                   <Chip 
                     label={car.status} 
                     size="small" 
-                    sx={{ position: 'absolute', top: 16, right: 16, fontWeight: 900, fontSize: '0.65rem', bgcolor: car.status === 'AVAILABLE' ? '#DCFCE7' : '#FEE2E2', color: car.status === 'AVAILABLE' ? '#166534' : '#991B1B' }} 
+                    sx={{ 
+                      position: 'absolute', top: 24, right: 24, 
+                      fontWeight: 900, fontSize: '0.65rem', 
+                      bgcolor: car.status === 'AVAILABLE' ? '#DCFCE7' : '#FEE2E2', 
+                      color: car.status === 'AVAILABLE' ? '#166534' : '#991B1B' 
+                    }} 
                   />
                 </Box>
-                <CardContent sx={{ p: 3, flexGrow: 1 }}>
-                  <Typography variant="caption" color="primary" fontWeight={800}>{car.brand.name}</Typography>
-                  <Typography variant="h6" fontWeight={800} color="#0F172A" sx={{ mb: 1.5 }}>{car.model.name}</Typography>
+                <CardContent sx={{ p: 3, pt: 2, flexGrow: 1 }}>
+                  <Typography variant="caption" color="primary" fontWeight={800} sx={{ letterSpacing: 0.5 }}>{car.brand.name}</Typography>
+                  <Typography variant="h6" fontWeight={800} color="#0F172A" sx={{ mb: 1.5, lineHeight: 1.2 }}>{car.model.name}</Typography>
                   <Stack direction="row" spacing={1} mb={3}>
-                    <Chip label={car.plateNumber} size="small" variant="outlined" icon={<PlateIcon sx={{ fontSize: 14 }} />} sx={{ fontWeight: 600 }} />
-                    <Chip label={car.fuelType} size="small" variant="outlined" sx={{ fontWeight: 600 }} />
+                    <Chip label={car.plateNumber} size="small" variant="outlined" icon={<PlateIcon sx={{ fontSize: 14 }} />} sx={{ fontWeight: 600, borderRadius: 1.5 }} />
+                    <Chip label={car.fuelType} size="small" variant="outlined" sx={{ fontWeight: 600, borderRadius: 1.5 }} />
                   </Stack>
                   <Divider sx={{ mb: 2, borderStyle: 'dashed' }} />
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Typography variant="h5" fontWeight={900}>€{car.pricePerDay}<Typography component="span" variant="caption" color="text.secondary">/day</Typography></Typography>
+                    <Typography variant="h5" fontWeight={900}>€{car.pricePerDay}<Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>/day</Typography></Typography>
                     <Stack direction="row" spacing={1}>
-                      <IconButton size="small" onClick={() => onEditClick(car.id)} sx={{ border: '1px solid #E2E8F0' }}><EditIcon fontSize="small" /></IconButton>
-                      <IconButton size="small" color="error" onClick={() => onDeleteClick(car)} sx={{ border: '1px solid', borderColor: alpha('#EF4444', 0.2), bgcolor: alpha('#EF4444', 0.02) }}><DeleteIcon fontSize="small" /></IconButton>
+                      <IconButton size="small" onClick={() => onEditClick(car.id)} sx={{ border: '1px solid #E2E8F0', borderRadius: 2 }}><EditIcon fontSize="small" /></IconButton>
+                      <IconButton size="small" color="error" onClick={() => onDeleteClick(car)} sx={{ border: '1px solid', borderColor: alpha('#EF4444', 0.2), bgcolor: alpha('#EF4444', 0.02), borderRadius: 2 }}><DeleteIcon fontSize="small" /></IconButton>
                     </Stack>
                   </Stack>
                 </CardContent>
@@ -223,7 +307,7 @@ export const AdminCarsView = ({
                 <TableRow key={car.id} hover>
                   <TableCell>
                     <Stack direction="row" spacing={2} alignItems="center">
-                      <Avatar src={car.images?.[0]?.url} variant="rounded" sx={{ width: 50, height: 35, bgcolor: '#F1F5F9', border: '1px solid #E2E8F0' }}><CarIcon /></Avatar>
+                      <CarImage src={car.images?.[0]?.url} alt={`${car.brand.name} ${car.model.name}`} size="small" />
                       <Box>
                         <Typography variant="body2" fontWeight={800} color="#0F172A">{car.brand.name} {car.model.name}</Typography>
                         <Typography variant="caption" color="text.secondary">{car.plateNumber}</Typography>

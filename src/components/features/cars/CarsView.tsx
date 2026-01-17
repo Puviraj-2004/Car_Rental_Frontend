@@ -1,18 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
+import Image from 'next/image';
 import {
   Box, Container, Grid, Typography, Card, Button, Chip, Stack,
   Divider, Checkbox, FormControlLabel, FormGroup, 
   IconButton, Snackbar, Alert, TextField,
-  InputAdornment, Paper, MenuItem, Select, FormControl, InputLabel ,Drawer
+  MenuItem, Select, FormControl, Drawer, Paper
 } from '@mui/material';
 import {
-  Settings as SettingsIcon, LocalGasStation as LocalGasStationIcon, 
-  EventSeat as EventSeatIcon, CalendarToday as CalendarTodayIcon, 
-  AccessTime as AccessTimeIcon, FavoriteBorder as FavoriteBorderIcon, 
-  ArrowForward as ArrowForwardIcon
+  Settings as SettingsIcon,
+  ArrowForward as ArrowForwardIcon,
+  CalendarToday as CalendarTodayIcon
 } from '@mui/icons-material';
+import { FilterPanel } from './FilterPanel';
 
 export const CarsView = ({
   mainFilter, onDateChange, onTimeChange, TIME_SLOTS,
@@ -21,38 +22,26 @@ export const CarsView = ({
   alert, onAlertClose, topBarRef, validationError
 }: any) => {
 
-  const FilterPanel = () => (
-    <Box>
-      <Typography variant="h6" fontWeight={800} mb={2}>Filters</Typography>
-      {[
-        { label: 'Brands', key: 'brandIds', data: brands },
-        { label: 'Transmission', key: 'transmissions', data: enums.transmissionEnum?.enumValues },
-        { label: 'Fuel Type', key: 'fuelTypes', data: enums.fuelTypeEnum?.enumValues },
-        { label: 'CritAir', key: 'critAirRatings', data: enums.critAirEnum?.enumValues },
-      ].map((section) => (
-        <Box key={section.key} sx={{ mb: 3 }}>
-          <Typography variant="subtitle2" fontWeight={700} color="text.secondary" mb={1}>{section.label}</Typography>
-          <FormGroup>
-            {section.data?.map((item: any) => (
-              <FormControlLabel
-                key={item.id || item.name}
-                control={<Checkbox size="small" checked={secondaryFilter[section.key].includes(item.id || item.name)} onChange={() => onCheckboxChange(section.key, item.id || item.name)} />}
-                label={<Typography variant="body2">{item.name?.replace('_', ' ')}</Typography>}
-              />
-            ))}
-          </FormGroup>
-          <Divider sx={{ mt: 2 }} />
-        </Box>
-      ))}
-    </Box>
-  );
+  // Memoized handlers to prevent unnecessary re-renders
+  const handleDateChange = useCallback((field: string, value: string) => {
+    onDateChange(field, value);
+  }, [onDateChange]);
+
+  const handleTimeChange = useCallback((field: string, value: string) => {
+    onTimeChange(field, value);
+  }, [onTimeChange]);
+
+  const handleCheckboxChange = useCallback((key: string, value: string) => {
+    onCheckboxChange(key, value);
+  }, [onCheckboxChange]);
 
   // Drawer state for mobile filters
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
     <Box sx={{ bgcolor: '#F8FAFC', minHeight: '100vh', pb: 8 }}>
-      {/* Validation Alert below date filters */}
+      
+      {/* Date Selection Bar (Sticky) */}
       <Paper ref={topBarRef} elevation={0} sx={{ position: 'fixed', top: { xs: 56, sm: 64, md: 80 }, left: 0, right: 0, zIndex: 99, py: { xs: 1, md: 1.5 }, borderBottom: '1px solid #E2E8F0', bgcolor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)' }}>
         <Container maxWidth="lg" sx={{ px: { xs: 0, sm: 2 } }}>
           <Grid container justifyContent="center">
@@ -85,14 +74,15 @@ export const CarsView = ({
                 <Box sx={{ flex: 1, minWidth: 180, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                   <Typography variant="subtitle2" fontWeight={700} color="primary" sx={{ mb: 0.25, fontSize: { xs: 13, md: 15 }, display: 'flex', alignItems: 'center', gap: 0.5 }}><CalendarTodayIcon fontSize="small" /> Pickup</Typography>
                   <Box sx={{ display: 'flex', gap: 0.5 }}>
-                    <TextField fullWidth type="date" value={mainFilter.startDate} onChange={(e) => onDateChange('startDate', e.target.value)}
+                    <TextField fullWidth type="date" value={mainFilter.startDate} onChange={(e) => handleDateChange('startDate', e.target.value)}
                       inputProps={{ min: new Date().toISOString().split('T')[0] }}
                       InputProps={{ sx: { fontWeight: 600, fontSize: { xs: 13, md: 15 }, py: 0.5 } }}
                       variant="outlined"
                       size="small"
                     />
                     <FormControl variant="outlined" sx={{ minWidth: { xs: 80, md: 110 } }} size="small">
-                      <Select value={mainFilter.startTime} onChange={(e) => onTimeChange('startTime', e.target.value)} displayEmpty sx={{ fontWeight: 600, fontSize: { xs: 13, md: 15 } }}>
+                      <Select value={mainFilter.startTime} onChange={(e) => handleTimeChange('startTime', e.target.value)} displayEmpty sx={{ fontWeight: 600, fontSize: { xs: 13, md: 15 } }}>
+                        <MenuItem value="" disabled>Time</MenuItem>
                         {TIME_SLOTS.map((t: string) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
                       </Select>
                     </FormControl>
@@ -106,7 +96,7 @@ export const CarsView = ({
                       fullWidth
                       type="date"
                       value={mainFilter.endDate}
-                      onChange={(e) => onDateChange('endDate', e.target.value)}
+                      onChange={(e) => handleDateChange('endDate', e.target.value)}
                       inputProps={{ min: mainFilter.startDate || new Date().toISOString().split('T')[0] }}
                       InputProps={{ sx: { fontWeight: 600, fontSize: { xs: 13, md: 15 }, py: 0.5 } }}
                       variant="outlined"
@@ -116,11 +106,11 @@ export const CarsView = ({
                     <FormControl variant="outlined" sx={{ minWidth: { xs: 80, md: 110 } }} size="small" disabled={!mainFilter.startDate || !mainFilter.startTime || !mainFilter.endDate}>
                       <Select
                         value={mainFilter.endTime}
-                        onChange={(e) => onTimeChange('endTime', e.target.value)}
+                        onChange={(e) => handleTimeChange('endTime', e.target.value)}
                         displayEmpty
                         sx={{ fontWeight: 600, fontSize: { xs: 13, md: 15 } }}
-                        disabled={!mainFilter.startDate || !mainFilter.startTime || !mainFilter.endDate}
                       >
+                         <MenuItem value="" disabled>Time</MenuItem>
                         {TIME_SLOTS.map((t: string) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
                       </Select>
                     </FormControl>
@@ -166,20 +156,35 @@ export const CarsView = ({
           <Typography variant="h6" fontWeight={800}>Filters</Typography>
           <IconButton onClick={() => setDrawerOpen(false)}><ArrowForwardIcon /></IconButton>
         </Box>
-        <FilterPanel />
+        <FilterPanel 
+          brands={brands} 
+          enums={enums} 
+          secondaryFilter={secondaryFilter} 
+          onCheckboxChange={handleCheckboxChange}
+        />
       </Drawer>
 
       <Container maxWidth="xl" sx={{ mt: { xs: 30, md: 24 } }}>
         <Grid container spacing={4}>
-          <Grid item md={3} sx={{ display: { xs: 'none', md: 'block' } }}><Paper sx={{ p: 3, position: 'sticky', top: 180, borderRadius: 4, border: '1px solid #E2E8F0' }}><FilterPanel /></Paper></Grid>
+          <Grid item md={3} sx={{ display: { xs: 'none', md: 'block' } }}><Paper sx={{ p: 3, position: 'sticky', top: 180, borderRadius: 4, border: '1px solid #E2E8F0' }}><FilterPanel brands={brands} enums={enums} secondaryFilter={secondaryFilter} onCheckboxChange={handleCheckboxChange} /></Paper></Grid>
           <Grid item xs={12} md={9}>
             <Typography variant="h5" fontWeight={800} color="#0F172A" mb={3}>{loading ? 'Updating fleet...' : `${cars.length} Vehicles Found`}</Typography>
             <Grid container spacing={3}>
               {cars.map((car: any) => (
                 <Grid item xs={12} sm={6} lg={4} key={car.id}>
                   <Card elevation={0} sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 4, border: '1px solid #E2E8F0', transition: '0.3s', '&:hover': { transform: 'translateY(-5px)', boxShadow: 4, borderColor: '#7C3AED' } }}>
-                    <Box sx={{ p: 2.5, display: 'flex', justifyContent: 'space-between' }}><Box><Typography variant="overline" color="text.secondary" fontWeight={700}>{car.brand.name}</Typography><Typography variant="h6" fontWeight={800}>{car.model.name}</Typography></Box><IconButton size="small"><FavoriteBorderIcon fontSize="small" /></IconButton></Box>
-                    <Box sx={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><img src={car.images?.[0]?.url || '/placeholder.jpg'} style={{ width: '90%', height: '100%', objectFit: 'contain' }} alt="car" /></Box>
+                    <Box sx={{ p: 2.5, display: 'flex', justifyContent: 'space-between' }}><Box><Typography variant="overline" color="text.secondary" fontWeight={700}>{car.brand.name}</Typography><Typography variant="h6" fontWeight={800}>{car.model.name}</Typography></Box></Box>
+                    <Box sx={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                      <Image 
+                        src={car.images?.[0]?.url || '/placeholder.jpg'} 
+                        alt="car" 
+                        fill
+                        style={{ objectFit: 'contain' }}
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        priority={cars.indexOf(car) === 0}
+                        loading={cars.indexOf(car) === 0 ? 'eager' : 'lazy'}
+                      />
+                    </Box>
                     <Box sx={{ p: 2.5, flexGrow: 1 }}>
                       <Stack direction="row" spacing={1} mb={3}><Chip size="small" label={car.transmission} /><Chip size="small" label={car.fuelType} /><Chip size="small" label={car.seats} /></Stack>
                       <Divider sx={{ my: 2, borderStyle: 'dashed' }} />

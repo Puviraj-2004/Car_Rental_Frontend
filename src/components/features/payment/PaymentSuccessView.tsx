@@ -1,16 +1,25 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Box, Container, Typography, Paper, Stack, Button, Divider } from '@mui/material';
 import { CheckCircle as SuccessIcon, ReceiptLong as ReceiptIcon, Home as HomeIcon } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { useApolloClient } from '@apollo/client';
 
 interface PaymentSuccessViewProps {
   bookingId: string | null;
 }
 
 export const PaymentSuccessView = ({ bookingId }: PaymentSuccessViewProps) => {
+  const client = useApolloClient();
+
+  // Clear cache to ensure fresh data after payment
+  useEffect(() => {
+    client.cache.evict({ fieldName: 'myBookings' });
+    client.cache.gc();
+  }, [client]);
+
   return (
     <Container maxWidth="sm">
       <Box sx={{ minHeight: '85vh', display: 'flex', alignItems: 'center', justifyContent: 'center', py: 4 }}>

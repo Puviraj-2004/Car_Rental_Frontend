@@ -5,7 +5,7 @@ import {
   Box, Container, Typography, Stack, Chip, Button, Table, TableBody, 
   TableCell, TableContainer, TableHead, TableRow, Paper, Avatar, 
   CircularProgress, Snackbar, Alert, Dialog, DialogContent, 
-  DialogTitle, Divider, Grid, TextField, IconButton, Card, CardActionArea
+  DialogTitle, Divider, Grid, TextField, IconButton, Card, CardActionArea, Tooltip
 } from '@mui/material';
 import {
   ContentCopy as CopyIcon, Close as CloseIcon, OpenInNew as OpenIcon,
@@ -31,8 +31,8 @@ const getStatusStyles = (status: string) => {
   switch (status) {
     case 'CONFIRMED': return { bg: '#ECFDF5', color: '#047857', border: '#A7F3D0', label: 'Confirmed' };
     case 'CANCELLED': return { bg: '#FEF2F2', color: '#B91C1C', border: '#FECACA', label: 'Cancelled' };
-    case 'PENDING': return { bg: '#FFF7ED', color: '#C2410C', border: '#FED7AA', label: 'Pending Docs' };
-    case 'VERIFIED': return { bg: '#EFF6FF', color: '#1D4ED8', border: '#BFDBFE', label: 'Ready to Pay' };
+    case 'PENDING': return { bg: '#FFF7ED', color: '#C2410C', border: '#FED7AA', label: 'Action Required' };
+    case 'VERIFIED': return { bg: '#EFF6FF', color: '#1D4ED8', border: '#BFDBFE', label: 'Identity Verified / Pay Now' };
     case 'ONGOING': return { bg: '#F5F3FF', color: '#6D28D9', border: '#DDD6FE', label: 'Active Trip' };
     case 'COMPLETED': return { bg: '#F8FAFC', color: '#475569', border: '#E2E8F0', label: 'Completed' };
     default: return { bg: '#F3F4F6', color: '#6B7280', border: '#E5E7EB', label: status };
@@ -206,7 +206,35 @@ export const BookingRecordsView = ({
                         <Button fullWidth variant="contained" startIcon={<OpenIcon />} onClick={() => window.open(`${window.location.origin}/verification/${selectedBooking.verification?.token}`, '_blank')} sx={{ bgcolor: '#7C3AED', py: 1.5, borderRadius: 3, fontWeight: 800, textTransform: 'none', '&:hover': { bgcolor: '#6D28D9' } }}>Open Verification Page</Button>
                         <Stack direction="row" spacing={2}>
                           <Button fullWidth variant="outlined" startIcon={<EditIcon />} onClick={() => onEdit(selectedBooking.id)} sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700, borderColor: '#E2E8F0', color: '#0F172A' }}>Modify Dates</Button>
-                          <Button fullWidth variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => onCancel(selectedBooking.id)} sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700 }}>Cancel</Button>
+                          {
+                            (() => {
+                              // Compute whether user can cancel (24 hours before pickup)
+                              let userCanCancel = true;
+                              try {
+                                if (selectedBooking) {
+                                  let pickupDt = new Date(selectedBooking.startDate);
+                                  if (selectedBooking.pickupTime) {
+                                    const datePart = new Date(selectedBooking.startDate).toISOString().split('T')[0];
+                                    pickupDt = new Date(`${datePart}T${selectedBooking.pickupTime}:00`);
+                                  }
+                                  const cutoff = new Date(pickupDt.getTime() - 24 * 60 * 60 * 1000);
+                                  userCanCancel = Date.now() <= cutoff.getTime();
+                                }
+                              } catch (e) {
+                                userCanCancel = true;
+                              }
+
+                              return (
+                                <Tooltip title={!userCanCancel ? 'Cancellation window closed — contact admin' : ''}>
+                                  <span style={{ display: 'block', width: '100%' }}>
+                                    <Button fullWidth variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => onCancel(selectedBooking.id)} sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700 }} disabled={!userCanCancel}>
+                                      Cancel
+                                    </Button>
+                                  </span>
+                                </Tooltip>
+                              );
+                            })()
+                          }
                         </Stack>
                       </Stack>
                     </Grid>
@@ -264,13 +292,14 @@ export const BookingRecordsView = ({
                    <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ mb: 1 }}>STATUS</Typography>
                    <Chip 
                     label={selectedBooking.status} 
-                    sx={{ fontWeight: 900, px: 2, bgcolor: getStatusStyles(selectedBooking.status).bg, color: getStatusStyles(selectedBooking.status).color, border: '1px solid currentColor' }} 
+                    size="small" 
+                    sx={{ fontWeight: 800, fontSize: '0.65rem', bgcolor: getStatusStyles(selectedBooking.status).bg, color: getStatusStyles(selectedBooking.status).color, border: `1px solid ${getStatusStyles(selectedBooking.status).border}`, borderRadius: 1.5 }} 
                    />
                 </Stack>
               </Box>
 
               {/* VERIFIED: Pay Now CTA */}
-              {selectedBooking.status === 'VERIFIED' && (
+              {selectedBooking.status === 'VERIFIED' && selectedBooking.payment?.status !== 'SUCCEEDED' && (
                 <Paper elevation={0} sx={{ mt: 4, p: 3, borderRadius: 4, bgcolor: '#F0F9FF', border: '1px solid #0EA5E9', textAlign: 'center' }}>
                   <Stack spacing={2} alignItems="center">
                     <Typography variant="body1" fontWeight={700} color="#0369A1">Identity Verified Successfully!</Typography>
@@ -283,7 +312,6 @@ export const BookingRecordsView = ({
               {selectedBooking.status === 'CANCELLED' && (
                 <Alert severity="error" icon={<InfoIcon />} sx={{ mt: 4, borderRadius: 3, fontWeight: 600 }}>This booking has been cancelled and the inventory released.</Alert>
               )}
-
             </DialogContent>
           </>
         )}

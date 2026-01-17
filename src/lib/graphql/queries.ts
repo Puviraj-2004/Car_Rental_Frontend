@@ -12,24 +12,7 @@ export const GET_ME_QUERY = gql`
       dateOfBirth
       fullAddress
       role
-      verification {
-        id
-        status
-        licenseNumber
-        licenseCategory
-        licenseExpiry
-        idNumber
-        idExpiry
-        licenseFrontUrl
-        licenseBackUrl
-        idCardUrl
-        addressProofUrl
-        rejectionReason
-        aiMetadata
-        verifiedAt
-        createdAt
-        updatedAt
-      }
+      
     }
   }
 `;
@@ -56,7 +39,6 @@ export const GET_MY_BOOKINGS_QUERY = gql`
       basePrice
       taxAmount
       depositAmount
-
       status
       bookingType
       repairOrderId
@@ -116,6 +98,14 @@ export const GET_ALL_BOOKINGS_QUERY = gql`
         email
         phoneNumber
       }
+      payment {
+        id
+        status
+        amount
+        stripeId
+        createdAt
+        updatedAt
+      }
       car {
         id
         plateNumber
@@ -126,6 +116,26 @@ export const GET_ALL_BOOKINGS_QUERY = gql`
           url
           isPrimary
         }
+      }
+      documentVerification {
+        id
+        licenseFrontUrl
+        licenseBackUrl
+        idCardUrl
+        idCardBackUrl
+        addressProofUrl
+        licenseNumber
+        licenseExpiry
+        licenseIssueDate
+        driverDob
+        licenseCategories
+        idNumber
+        idExpiry
+        verifiedAddress
+        status
+        aiMetadata
+        rejectionReason
+        verifiedAt
       }
     }
   }
@@ -168,8 +178,15 @@ export const GET_CAR_QUERY = gql`
   query GetCar($id: ID!) {
     car(id: $id) {
       id
-      brand { id name }
-      model { id name }
+      brand {
+        id
+        name
+      }
+      model {
+        id
+        name
+        brandId
+      }
       year
       plateNumber
       fuelType
@@ -200,8 +217,8 @@ export const GET_AVAILABLE_CARS_QUERY = gql`
   query GetAvailableCars($startDate: String!, $endDate: String!) {
     availableCars(startDate: $startDate, endDate: $endDate) {
       id
-      brand { name }
-      model { name }
+      brand { id name }
+      model { id name }
       year
       fuelType
       transmission
@@ -264,10 +281,21 @@ export const GET_BRANDS_QUERY = gql`
 `;
 
 export const GET_MODELS_QUERY = gql`
-  query GetModels($brandId: ID!) {
+  query GetModels {
+    models {
+      id
+      name
+      brandId
+    }
+  }
+`;
+
+export const GET_MODELS_BY_BRAND_QUERY = gql`
+  query GetModelsByBrand($brandId: ID!) {
     models(brandId: $brandId) {
       id
       name
+      brandId
     }
   }
 `;
@@ -283,26 +311,19 @@ export const GET_BOOKING_QUERY = gql`
 
       user {
         id
-        verification {
-          status
-          licenseFrontUrl
-          licenseBackUrl
-          idCardUrl
-          addressProofUrl
-        }
+        fullName
+        email
+        phoneNumber
       }
 
-      # Meter Tracking
       startOdometer
       endOdometer
       extraKmFee
-
-      # Financials
+      returnNotes
       totalPrice
       basePrice
       taxAmount
       depositAmount
-
       status
       bookingType
       repairOrderId
@@ -326,6 +347,26 @@ export const GET_BOOKING_QUERY = gql`
       payment {
         status
         amount
+      }
+      documentVerification {
+        id
+        licenseFrontUrl
+        licenseBackUrl
+        idCardUrl
+        idCardBackUrl
+        addressProofUrl
+        licenseNumber
+        licenseExpiry
+        licenseIssueDate
+        driverDob
+        licenseCategories
+        idNumber
+        idExpiry
+        verifiedAddress
+        status
+        aiMetadata
+        rejectionReason
+        verifiedAt
       }
     }
   }

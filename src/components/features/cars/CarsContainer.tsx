@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { addHours, isBefore, isSameDay, isToday } from 'date-fns';
@@ -72,62 +72,62 @@ export const CarsContainer = () => {
     return { filterPayload: payload, isValidSelection: valid, hasDates: true, shouldSkip: !valid, validationError };
   }, [mainFilter, secondaryFilter]);
 
-  const { cars, enums, brands, loading, createBooking } = useCars(filterPayload, shouldSkip);
+  const { cars, enums, brands, loading } = useCars(filterPayload, shouldSkip);
 
-  const handleBookClick = async (car: any) => {
+  const handleBookClick = (car: any) => {
+    // 1. Validate Selection
     if (!hasDates || !isValidSelection) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      setAlert({ open: true, message: validationError || 'Please select valid dates.', severity: 'warning' });
-      return;
-    }
-
-    if (status !== 'authenticated') {
-      const params = new URLSearchParams({
-        carId: car.id,
-        start: `${mainFilter.startDate}T${mainFilter.startTime}`,
-        end: `${mainFilter.endDate}T${mainFilter.endTime}`
-      });
-      router.push(`/login?redirect=${encodeURIComponent(`/booking?${params.toString()}`)}`);
-      return;
-    }
-
-    try {
-      const days = Math.ceil((new Date(mainFilter.endDate).getTime() - new Date(mainFilter.startDate).getTime()) / 86400000) || 1;
-      const { data } = await createBooking({
-        variables: {
-          input: {
-            carId: car.id,
-            startDate: new Date(`${mainFilter.startDate}T${mainFilter.startTime}:00`).toISOString(),
-            endDate: new Date(`${mainFilter.endDate}T${mainFilter.endTime}:00`).toISOString(),
-            totalPrice: car.pricePerDay * days,
-            bookingType: 'RENTAL'
-          }
-        }
-      });
-      if (data?.createBooking?.id) {
-        const params = new URLSearchParams({
-          bookingId: data.createBooking.id,
-          carId: car.id,
-          start: `${mainFilter.startDate}T${mainFilter.startTime}`,
-          end: `${mainFilter.endDate}T${mainFilter.endTime}`
-        });
-        router.push(`/booking?${params.toString()}`);
+      if (topBarRef.current) {
+        topBarRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
-    } catch (e: any) {
-      setAlert({ open: true, message: e.message, severity: 'error' });
+      setAlert({ open: true, message: validationError || 'Please select valid dates to proceed.', severity: 'warning' });
+      // Mark fields as touched to show errors in UI
+      setTouched({ startDate: true, startTime: true, endDate: true, endTime: true });
+      return;
+    }
+
+    // 2. Construct URL Parameters
+    // We combine date and time into the ISO-like format expected by BookingContainer
+    const startDateTime = `${mainFilter.startDate}T${mainFilter.startTime}`;
+    const endDateTime = `${mainFilter.endDate}T${mainFilter.endTime}`;
+
+    const params = new URLSearchParams({
+      carId: car.id,
+      start: startDateTime,
+      end: endDateTime
+    });
+
+    const targetUrl = `/booking?${params.toString()}`;
+
+    // 3. Navigate (Handle Auth Redirect if needed)
+    if (status !== 'authenticated') {
+      router.push(`/login?redirect=${encodeURIComponent(targetUrl)}`);
+    } else {
+      router.push(targetUrl);
     }
   };
 
-  // Enhanced handlers to track user interaction
-  const handleDateChange = (f: any, v: any) => {
-    setMainFilter((p) => ({ ...p, [f]: v }));
-    setTouched((t) => ({ ...t, [f]: true }));
-  };
-  const handleTimeChange = (f: any, v: any) => {
-    setMainFilter((p) => ({ ...p, [f]: v }));
-    setTouched((t) => ({ ...t, [f]: true }));
-  };
-  // Show validation if any date/time field has been touched
+  const handleDateChange = useCallback((f: string, v: string) => {
+    setMainFilter((p: any) => ({ ...p, [f]: v }));
+    setTouched((t: any) => ({ ...t, [f]: true }));
+  }, []);
+
+  const handleTimeChange = useCallback((f: string, v: string) => {
+    setMainFilter((p: any) => ({ ...p, [f]: v }));
+    setTouched((t: any) => ({ ...t, [f]: true }));
+  }, []);
+
+  const handleCheckboxChange = useCallback((k: string, v: string) => {
+    setSecondaryFilter((p: any) => ({
+      ...p,
+      [k]: p[k].includes(v) 
+        ? p[k].filter((x: any) => x !== v) 
+        : [...p[k], v]
+    }));
+  }, []);
+
   const showValidation = Object.values(touched).some(Boolean);
 
   return (
@@ -137,7 +137,7 @@ export const CarsContainer = () => {
       onTimeChange={handleTimeChange}
       TIME_SLOTS={Array.from({ length: 48 }, (_, i) => `${Math.floor(i / 2).toString().padStart(2, '0')}:${i % 2 ? '30' : '00'}`)}
       secondaryFilter={secondaryFilter}
-      onCheckboxChange={(c: any, v: any) => setSecondaryFilter((p: any) => ({ ...p, [c]: p[c].includes(v) ? p[c].filter((x: any) => x !== v) : [...p[c], v] }))}
+      onCheckboxChange={handleCheckboxChange}
       brands={brands}
       enums={enums}
       loading={loading}

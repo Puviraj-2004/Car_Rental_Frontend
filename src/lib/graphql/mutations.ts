@@ -101,6 +101,8 @@ export const UPDATE_CAR_MUTATION = gql`
   mutation UpdateCar($id: ID!, $input: UpdateCarInput!) {
     updateCar(id: $id, input: $input) {
       id
+      brand { name }
+      model { name }
       status
       dailyKmLimit
       extraKmCharge
@@ -216,17 +218,27 @@ export const RESEND_VERIFICATION_LINK_MUTATION = gql`
 export const CREATE_OR_UPDATE_VERIFICATION_MUTATION = gql`
   mutation CreateOrUpdateVerification($input: DocumentVerificationInput!) {
     createOrUpdateVerification(input: $input) {
-      id
-      userId
+      bookingId
+      booking{
+        id 
+        user{
+          id 
+          fullName
+        }
+      }
       licenseFrontUrl
       licenseBackUrl
       idCardUrl
+      idCardBackUrl
       addressProofUrl
       licenseNumber
       licenseExpiry
-      licenseCategory
+      licenseIssueDate
+      driverDob
+      licenseCategories
       idNumber
       idExpiry
+      verifiedAddress
       status
     }
   }
@@ -331,9 +343,9 @@ export const PROCESS_DOCUMENT_OCR_MUTATION = gql`
       documentId
       licenseNumber
       expiryDate
+      issueDate
       birthDate
       address
-      licenseCategory
       licenseCategories
       restrictsToAutomatic
       isQuotaExceeded

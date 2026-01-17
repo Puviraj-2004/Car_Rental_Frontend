@@ -47,16 +47,21 @@ export const InventoryContainer = () => {
 
   const handleConfirmDelete = async () => {
     try {
+      console.log('Deleting item:', selectedItem); // Debug log
       if (selectedItem.type === 'BRAND') {
         await mutations.deleteBrand({ variables: { id: selectedItem.id } });
         refetchBrands();
       } else {
+        console.log('Model ID to delete:', selectedItem.id); // Debug log
         await mutations.deleteModel({ variables: { id: selectedItem.id } });
         refetchModels();
       }
       setDeleteOpen(false);
       setAlert({ open: true, msg: 'Deleted successfully!', severity: 'warning' });
-    } catch (e: any) { setAlert({ open: true, msg: e.message, severity: 'error' }); }
+    } catch (e: any) { 
+      console.error('Delete error:', e); // Debug log
+      setAlert({ open: true, msg: e.message, severity: 'error' }); 
+    }
   };
 
   return (

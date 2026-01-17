@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next dev",
+    "start": "next start",
     "lint": "next lint",
     "analyze": "ANALYZE=true next build",
     "test": "echo \"Error: no test specified\" && exit 1"

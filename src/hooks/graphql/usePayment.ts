@@ -9,7 +9,7 @@ export const usePayment = (bookingId: string) => {
   const { data, loading, error } = useQuery(GET_BOOKING_QUERY, {
     variables: { id: bookingId },
     skip: !bookingId || status !== 'authenticated',
-    fetchPolicy: 'network-only'
+    fetchPolicy: 'network-only' // Always fetch fresh status
   });
 
   const [createCheckoutSession] = useMutation(CREATE_STRIPE_CHECKOUT_SESSION_MUTATION);

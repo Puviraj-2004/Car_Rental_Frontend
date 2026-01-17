@@ -56,7 +56,7 @@ export const AddCarContainer = () => {
     }
 
     try {
-      const { brandId, ...carInput } = formData;
+      const carInput = formData;
       const { data } = await createCar({ variables: { input: carInput } });
       const carId = data?.createCar?.id;
 
