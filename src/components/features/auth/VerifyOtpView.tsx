@@ -12,10 +12,14 @@ interface VerifyOtpViewProps {
   otp: string[];
   error: string;
   success: string;
+  resendSuccess: string;
   loading: boolean;
+  resendLoading: boolean;
+  resendCooldown: number;
   onOtpChange: (value: string, index: number) => void;
   onKeyDown: (e: React.KeyboardEvent, index: number) => void;
   onSubmit: (e: React.FormEvent) => void;
+  onResend: () => void;
 }
 
 const COLORS = {
@@ -29,10 +33,14 @@ export const VerifyOtpView = ({
   otp,
   error,
   success,
+  resendSuccess,
   loading,
+  resendLoading,
+  resendCooldown,
   onOtpChange,
   onKeyDown,
-  onSubmit
+  onSubmit,
+  onResend
 }: VerifyOtpViewProps) => {
   return (
     <Grid container sx={{ height: '100vh', bgcolor: 'white' }}>
@@ -66,6 +74,7 @@ export const VerifyOtpView = ({
 
           {error && <Alert severity="error" sx={{ mb: 3, borderRadius: 3 }}>{error}</Alert>}
           {success && <Alert severity="success" sx={{ mb: 3, borderRadius: 3 }}>{success}</Alert>}
+          {resendSuccess && <Alert severity="success" sx={{ mb: 3, borderRadius: 3 }}>{resendSuccess}</Alert>}
 
           <form onSubmit={onSubmit}>
             <Stack direction="row" spacing={1.5} justifyContent="center" sx={{ mb: 5 }}>
@@ -122,8 +131,25 @@ export const VerifyOtpView = ({
           <Box sx={{ mt: 5 }}>
             <Typography variant="body2" color="#64748B">
               Didn't receive the code? {' '}
-              <Button sx={{ fontWeight: 800, color: COLORS.primary, textTransform: 'none' }}>
-                Resend OTP
+              <Button 
+                onClick={onResend}
+                disabled={resendCooldown > 0 || resendLoading}
+                sx={{ 
+                  fontWeight: 800, 
+                  color: COLORS.primary, 
+                  textTransform: 'none',
+                  padding: 0,
+                  '&:hover': { bgcolor: 'transparent', textDecoration: 'underline' },
+                  '&:disabled': { color: '#9CA3AF', cursor: 'not-allowed' }
+                }}
+              >
+                {resendLoading ? (
+                  <CircularProgress size={16} sx={{ mr: 1 }} />
+                ) : resendCooldown > 0 ? (
+                  `Resend in ${resendCooldown}s`
+                ) : (
+                  'Resend OTP'
+                )}
               </Button>
             </Typography>
           </Box>

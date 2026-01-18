@@ -26,7 +26,7 @@ const statusStyles: any = {
 
 export const AdminBookingsView = ({ 
   bookings, onRowClick, searchQuery, setSearchQuery, 
-  statusFilter, setStatusFilter, onCreateClick 
+  statusFilter, setStatusFilter, onCreateClick, viewLabel 
 }: any) => {
   return (
     <Box sx={{ p: 4 }}>
@@ -34,7 +34,9 @@ export const AdminBookingsView = ({
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" mb={4} spacing={2}>
         <Box>
           <Typography variant="h4" fontWeight={900} color="#0F172A">Booking Records</Typography>
-          <Typography variant="body2" color="text.secondary">Managing {bookings.length} visible reservations</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {viewLabel ? `${viewLabel} · ` : ''}Managing {bookings.length} visible reservations
+          </Typography>
         </Box>
         
         <Stack direction="row" spacing={2}>
@@ -100,16 +102,22 @@ export const AdminBookingsView = ({
               bookings.map((b: any) => {
                 const style = statusStyles[b.status] || { bg: '#f5f5f5', color: '#333' };
                 const isCourtesy = b.bookingType === 'REPLACEMENT';
+                const isWalkIn = b.isWalkIn;
+                const displayName = b.guestName || b.user?.fullName || 'Guest';
+                const displayContact = b.guestPhone || b.user?.email || b.guestEmail;
                 
                 return (
                   <TableRow key={b.id} hover onClick={() => onRowClick(b)} sx={{ cursor: 'pointer' }}>
                     <TableCell>
                       <Typography variant="body2" fontWeight={700} fontFamily="monospace">#{b.id.slice(-6).toUpperCase()}</Typography>
-                      {isCourtesy && <Chip label="COURTESY" size="small" color="secondary" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 700 }} />}
+                      <Stack direction="row" spacing={0.5} mt={0.5}>
+                        {isCourtesy && <Chip label="COURTESY" size="small" color="secondary" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 700 }} />}
+                        {isWalkIn && <Chip label="WALK-IN" size="small" color="primary" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 700 }} />}
+                      </Stack>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" fontWeight={700}>{b.user?.fullName || 'Guest'}</Typography>
-                      <Typography variant="caption" color="text.secondary" display="block">{b.user?.email}</Typography>
+                      <Typography variant="body2" fontWeight={700}>{displayName}</Typography>
+                      <Typography variant="caption" color="text.secondary" display="block">{displayContact}</Typography>
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" fontWeight={600}>{b.car?.model?.name}</Typography>

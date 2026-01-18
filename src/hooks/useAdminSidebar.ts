@@ -36,6 +36,8 @@ export const useAdminSidebar = () => {
     { text: 'Dashboard', icon: Dashboard, path: '/admin/dashboard' },
     { text: 'Cars Management', icon: DirectionsCar, path: '/admin/cars' },
     { text: 'Bookings', icon: BookOnline, path: '/admin/bookings' },
+    { text: 'Onsite Rentals', icon: BookOnline, path: '/admin/bookings/onsite' },
+    { text: 'Replacement Bookings', icon: BookOnline, path: '/admin/bookings/replacement' },
     { text: 'Inventory', icon: BrandingWatermark, path: '/admin/inventory' },
     { text: 'Users', icon: People, path: '/admin/users' },
   ];

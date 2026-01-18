@@ -6,15 +6,8 @@ import { gql } from '@apollo/client';
 export const REGISTER_MUTATION = gql`
   mutation Register($input: RegisterInput!) {
     register(input: $input) {
-      token
-      user {
-        id
-        fullName
-        email
-        phoneNumber
-        role
-      }
       message
+      email
     }
   }
 `;
@@ -30,7 +23,6 @@ export const LOGIN_MUTATION = gql`
         email
         phoneNumber
         role
-        isEmailVerified
       }
     }
   }
@@ -58,6 +50,17 @@ export const VERIFY_OTP_MUTATION = gql`
     verifyOTP(email: $email, otp: $otp) {
       success
       message
+    }
+  }
+`;
+
+// 5. OTP Resend
+export const RESEND_OTP_MUTATION = gql`
+  mutation ResendOTP($email: String!) {
+    resendOTP(email: $email) {
+      success
+      message
+      expiresAt
     }
   }
 `;
@@ -466,10 +469,12 @@ export const DELETE_USER_MUTATION = gql`
 `;
 
 export const START_TRIP_MUTATION = gql`
-  mutation StartTrip($bookingId: String!) {
-    startTrip(bookingId: $bookingId) {
+  mutation StartTrip($bookingId: String!, $startOdometer: Float, $pickupNotes: String) {
+    startTrip(bookingId: $bookingId, startOdometer: $startOdometer, pickupNotes: $pickupNotes) {
       id
       status
+      startOdometer
+      pickupNotes
       car {
         id
         status

@@ -1,13 +1,14 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import {
   Box, Typography, TextField, Button, InputAdornment, 
   Link, Divider, IconButton, Alert, Stack, Grid, CircularProgress
 } from '@mui/material';
 import {
   EmailOutlined, LockOutlined, Google, Facebook,
-  Visibility, VisibilityOff, DirectionsCar
+  Visibility, VisibilityOff, ArrowForward
 } from '@mui/icons-material';
 
 interface LoginViewProps {
@@ -22,11 +23,11 @@ interface LoginViewProps {
 }
 
 const COLORS = {
-  primary: '#2563EB',
-  darkBlue: '#1E3A8A',
-  inputBg: '#F3F4F6',
-  textMain: '#1F2937',
-  textSub: '#6B7280',
+  primary: '#0F172A',
+  accent: '#3B82F6',
+  inputBg: '#F8FAFC',
+  textSub: '#64748B',
+  success: '#10B981',
 };
 
 export const LoginView = ({
@@ -41,68 +42,94 @@ export const LoginView = ({
 }: LoginViewProps) => {
   const inputStyles = {
     '& .MuiOutlinedInput-root': {
-      borderRadius: '16px',
+      borderRadius: '12px',
       backgroundColor: COLORS.inputBg,
-      '& fieldset': { borderWidth: '0px' },
-      '&.Mui-focused': {
-        backgroundColor: '#FFFFFF',
-        boxShadow: `0 0 0 2px ${COLORS.primary}33`,
-        '& fieldset': { borderWidth: '1px', borderColor: COLORS.primary }
-      }
+      transition: 'all 0.3s ease',
+      '& fieldset': { border: '1px solid #E2E8F0' },
+      '&:hover fieldset': { borderColor: COLORS.accent },
+      '&.Mui-focused fieldset': { borderColor: COLORS.accent },
     },
-    '& input': { padding: '16px 20px', fontSize: '0.95rem', fontWeight: 500 }
+    '& input': { padding: '12px 14px', fontSize: '0.9rem' }
   };
 
   return (
     <Box sx={{ height: '100vh', width: '100vw', overflow: 'hidden', bgcolor: '#FFFFFF' }}>
       <Grid container sx={{ height: '100%' }}>
+        
+        {/* Left Side - Hero Image Section */}
         <Grid item xs={0} md={6} lg={7} sx={{ 
-          display: { xs: 'none', md: 'flex' },
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          background: `linear-gradient(135deg, ${COLORS.darkBlue} 0%, ${COLORS.primary} 100%)`,
-          p: 6
+          display: { xs: 'none', md: 'block' }, 
+          position: 'relative',
+          height: '100%'
         }}>
-          <Box sx={{ textAlign: 'center', color: 'white', maxWidth: '500px' }}>
-            <Stack direction="row" spacing={2} justifyContent="center" alignItems="center" sx={{ mb: 3 }}>
-              <DirectionsCar sx={{ fontSize: 50 }} />
-              <Typography variant="h4" fontWeight="bold">RENTCAR</Typography>
-            </Stack>
-            <Typography variant="h3" fontWeight="800" sx={{ mb: 2, lineHeight: 1.2 }}>
-              The journey begins with the right car.
+          <Image 
+            src="/images/auth/login.jpg"
+            alt="Luxury Car" 
+            fill 
+            style={{ objectFit: 'cover' }}
+            priority
+          />
+          
+          {/* Overlay for Premium Look */}
+          <Box sx={{ 
+            position: 'absolute', 
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: 'linear-gradient(to bottom, rgba(15,23,42,0.7) 0%, rgba(15,23,42,0.2) 40%, rgba(15,23,42,0.7) 100%)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            p: 8
+          }}>
+            <Typography variant="h2" fontWeight={800} sx={{ color: 'white', mb: 1, letterSpacing: '-1px', lineHeight: 1.1 }}>
+              Welcome <br /> Back.
             </Typography>
-            <Typography variant="body1" sx={{ opacity: 0.8 }}>
-              Sign in to access our premium fleet and manage your bookings effortlessly.
+            <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.8)', fontWeight: 400, maxWidth: '400px' }}>
+              Sign in to manage your bookings and explore our premium fleet.
             </Typography>
           </Box>
+
+          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', position: 'absolute', bottom: 30, left: 60 }}>
+            © 2026 RentCar Premium.
+          </Typography>
         </Grid>
 
-        <Grid item xs={12} md={6} lg={5} sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', px: { xs: 3, md: 8 } }}>
-          <Box sx={{ width: '100%', maxWidth: '400px' }}>
+        {/* Right Side - Login Form */}
+        <Grid item xs={12} md={6} lg={5} sx={{ 
+          height: '100%', 
+          overflowY: 'auto', 
+          display: 'flex', 
+          flexDirection: 'column',
+          bgcolor: '#FFFFFF'
+        }}>
+          <Box sx={{ p: { xs: 4, md: 6, lg: 8 }, maxWidth: '500px', mx: 'auto', width: '100%' }}>
+            
             <Box sx={{ mb: 4 }}>
-              <Typography variant="h4" fontWeight="900" color={COLORS.textMain} sx={{ mb: 1 }}>Welcome Back 👋</Typography>
-              <Typography variant="body2" color={COLORS.textSub}>Sign in to your account</Typography>
+              <Typography variant="h4" fontWeight={800} color={COLORS.primary} sx={{ mb: 1 }}>
+                Welcome Back
+              </Typography>
+              <Typography variant="body2" color={COLORS.textSub}>
+                Sign in to your premium account.
+              </Typography>
             </Box>
 
-            {error && <Alert severity="error" sx={{ mb: 3, borderRadius: '12px' }}>{error}</Alert>}
+            {error && (
+              <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{error}</Alert>
+            )}
 
             <form onSubmit={onSubmit} autoComplete="off">
               <Stack spacing={2.5}>
                 <Box>
-                  <Typography variant="caption" fontWeight="700" sx={{ mb: 0.5, display: 'block', ml: 1 }}>Email Address</Typography>
-                  <TextField 
-                    fullWidth placeholder="email@example.com" sx={inputStyles}
+                  <Typography variant="caption" fontWeight={700} sx={{ mb: 0.5, display: 'block', color: COLORS.primary }}>Email Address</Typography>
+                  <TextField fullWidth placeholder="you@example.com" sx={inputStyles} autoComplete="off"
                     value={formData.email} 
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    InputProps={{ startAdornment: <InputAdornment position="start"><EmailOutlined fontSize="small" /></InputAdornment> }}
+                    InputProps={{ startAdornment: <InputAdornment position="start"><EmailOutlined fontSize="small" /></InputAdornment> }} 
                   />
                 </Box>
 
                 <Box>
-                  <Typography variant="caption" fontWeight="700" sx={{ mb: 0.5, display: 'block', ml: 1 }}>Password</Typography>
-                  <TextField
-                    fullWidth placeholder="••••••••" type={showPassword ? 'text' : 'password'} sx={inputStyles}
+                  <Typography variant="caption" fontWeight={700} sx={{ mb: 0.5, display: 'block', color: COLORS.primary }}>Password</Typography>
+                  <TextField fullWidth placeholder="••••••••" type={showPassword ? 'text' : 'password'} sx={inputStyles} autoComplete="new-password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     InputProps={{
@@ -119,26 +146,19 @@ export const LoginView = ({
                 </Box>
 
                 <Button 
-                  type="submit" fullWidth variant="contained" disabled={loading}
-                  sx={{ bgcolor: COLORS.primary, py: 1.8, borderRadius: '16px', fontWeight: '700', textTransform: 'none', mt: 1 }}>
+                  type="submit" fullWidth variant="contained" disabled={!!loading}
+                  endIcon={loading ? null : <ArrowForward />}
+                  sx={{ 
+                    bgcolor: COLORS.primary, py: 1.5, borderRadius: '12px', fontWeight: 700, textTransform: 'none',
+                    '&:hover': { bgcolor: '#1E293B', transform: 'translateY(-1px)' }, transition: 'all 0.2s'
+                  }}>
                   {loading ? <CircularProgress size={24} color="inherit" /> : 'Sign In'}
                 </Button>
 
-                <Box sx={{ textAlign: 'center', my: 2 }}>
-                  <Divider><Typography variant="caption" color="text.secondary">OR CONTINUE WITH</Typography></Divider>
-                </Box>
+                <Divider sx={{ my: 1 }} />
 
-                <Stack direction="row" spacing={2} justifyContent="center">
-                  <IconButton onClick={onGoogleLogin} sx={{ border: '1px solid #E5E7EB', borderRadius: '12px', p: 1.2 }}>
-                    <Google sx={{ color: '#EA4335' }} />
-                  </IconButton>
-                  <IconButton sx={{ border: '1px solid #E5E7EB', borderRadius: '12px', p: 1.2 }}>
-                    <Facebook sx={{ color: '#1877F2' }} />
-                  </IconButton>
-                </Stack>
-
-                <Typography variant="body2" textAlign="center" sx={{ mt: 3 }}>
-                  Don't have an account? <Link href="/register" sx={{ color: COLORS.primary, fontWeight: 700, textDecoration: 'none' }}>Create Account</Link>
+                <Typography variant="body2" textAlign="center" sx={{ color: COLORS.textSub }}>
+                  Don't have an account? <Link href="/register" sx={{ color: COLORS.accent, fontWeight: 700, textDecoration: 'none' }}>Create Account</Link>
                 </Typography>
               </Stack>
             </form>

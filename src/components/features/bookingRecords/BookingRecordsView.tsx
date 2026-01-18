@@ -208,10 +208,44 @@ export const BookingRecordsView = ({
                           <Button fullWidth variant="outlined" startIcon={<EditIcon />} onClick={() => onEdit(selectedBooking.id)} sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700, borderColor: '#E2E8F0', color: '#0F172A' }}>Modify Dates</Button>
                           {
                             (() => {
-                              // Compute whether user can cancel (24 hours before pickup)
-                              let userCanCancel = true;
-                              try {
-                                if (selectedBooking) {
+                              const status = selectedBooking?.status;
+                              const cannotCancel = status === 'COMPLETED' || status === 'CANCELLED';
+                              
+                              if (cannotCancel) {
+                                return (
+                                  <Tooltip title="Cannot cancel completed or cancelled bookings">
+                                    <span style={{ display: 'block', width: '100%' }}>
+                                      <Button fullWidth variant="outlined" color="error" startIcon={<CancelIcon />} sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700 }} disabled>
+                                        Cancel
+                                      </Button>
+                                    </span>
+                                  </Tooltip>
+                                );
+                              }
+
+                              if (status === 'PENDING' || status === 'VERIFIED') {
+                                return (
+                                  <Button fullWidth variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => onCancel(selectedBooking.id)} sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700 }}>
+                                    Cancel
+                                  </Button>
+                                );
+                              }
+
+                              if (status === 'ONGOING') {
+                                return (
+                                  <Tooltip title="Only admins can cancel an ongoing booking">
+                                    <span style={{ display: 'block', width: '100%' }}>
+                                      <Button fullWidth variant="outlined" color="error" startIcon={<CancelIcon />} sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700 }} disabled>
+                                        Cancel
+                                      </Button>
+                                    </span>
+                                  </Tooltip>
+                                );
+                              }
+
+                              if (status === 'CONFIRMED') {
+                                let userCanCancel = true;
+                                try {
                                   let pickupDt = new Date(selectedBooking.startDate);
                                   if (selectedBooking.pickupTime) {
                                     const datePart = new Date(selectedBooking.startDate).toISOString().split('T')[0];
@@ -219,19 +253,25 @@ export const BookingRecordsView = ({
                                   }
                                   const cutoff = new Date(pickupDt.getTime() - 24 * 60 * 60 * 1000);
                                   userCanCancel = Date.now() <= cutoff.getTime();
+                                } catch (e) {
+                                  userCanCancel = true;
                                 }
-                              } catch (e) {
-                                userCanCancel = true;
+
+                                return (
+                                  <Tooltip title={!userCanCancel ? 'Cancellation window closed — contact admin' : ''}>
+                                    <span style={{ display: 'block', width: '100%' }}>
+                                      <Button fullWidth variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => onCancel(selectedBooking.id)} sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700 }} disabled={!userCanCancel}>
+                                        Cancel
+                                      </Button>
+                                    </span>
+                                  </Tooltip>
+                                );
                               }
 
                               return (
-                                <Tooltip title={!userCanCancel ? 'Cancellation window closed — contact admin' : ''}>
-                                  <span style={{ display: 'block', width: '100%' }}>
-                                    <Button fullWidth variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => onCancel(selectedBooking.id)} sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700 }} disabled={!userCanCancel}>
-                                      Cancel
-                                    </Button>
-                                  </span>
-                                </Tooltip>
+                                <Button fullWidth variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => onCancel(selectedBooking.id)} sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700 }}>
+                                  Cancel
+                                </Button>
                               );
                             })()
                           }

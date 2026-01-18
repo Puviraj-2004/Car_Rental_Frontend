@@ -42,6 +42,11 @@ export const GET_MY_BOOKINGS_QUERY = gql`
       status
       bookingType
       repairOrderId
+      createdByAdmin
+      isWalkIn
+      guestName
+      guestPhone
+      guestEmail
       verification {
         id
         token
@@ -84,6 +89,11 @@ export const GET_ALL_BOOKINGS_QUERY = gql`
       status
       bookingType
       repairOrderId
+      createdByAdmin
+      isWalkIn
+      guestName
+      guestPhone
+      guestEmail
       createdAt
       verification {
         id
@@ -327,6 +337,11 @@ export const GET_BOOKING_QUERY = gql`
       status
       bookingType
       repairOrderId
+      createdByAdmin
+      isWalkIn
+      guestName
+      guestPhone
+      guestEmail
       car {
         id
         brand { name }
@@ -414,6 +429,11 @@ export const GET_BOOKING_BY_TOKEN_QUERY = gql`
       status
       bookingType
       repairOrderId
+      createdByAdmin
+      isWalkIn
+      guestName
+      guestPhone
+      guestEmail
       verification {
         id
         token
@@ -449,5 +469,12 @@ export const GET_BOOKING_BY_TOKEN_QUERY = gql`
         amount
       }
     }
+  }
+`;
+
+// --- 🔐 AUTH UTILS ---
+export const IS_EMAIL_AVAILABLE_QUERY = gql`
+  query IsEmailAvailable($email: String!) {
+    isEmailAvailable(email: $email)
   }
 `;

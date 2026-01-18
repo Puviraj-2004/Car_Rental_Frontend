@@ -34,6 +34,11 @@ export const BookingContainer = () => {
   const [verificationTimer, setVerificationTimer] = useState<string>('60:00');
   const [copySuccess, setCopySuccess] = useState(false);
   const [validationError, setValidationError] = useState('');
+  const [isWalkIn, setIsWalkIn] = useState(false);
+  const [guestName, setGuestName] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [bookingType, setBookingType] = useState<'RENTAL' | 'REPLACEMENT'>('RENTAL');
 
   // Sync URL Params
   useEffect(() => {
@@ -69,12 +74,12 @@ export const BookingContainer = () => {
       error = 'Pickup date must be today or a future date.';
     } else if (isToday(pickupDate) && isBefore(start, minPickupTime)) {
       error = 'Pickup time must be at least 1 hour from now.';
-    } else if (end < start) {
+    } else if (end <= start) {
       error = 'Return date/time must be after pickup date/time.';
-    } else if (isSameDay(start, end)) {
+    } else {
       const durationHours = (end.getTime() - start.getTime()) / 36e5;
       if (durationHours < 2) {
-        error = 'Minimum booking duration is 2 hours for same-day pickups.';
+        error = 'Minimum booking duration is 2 hours.';
       }
     }
     
@@ -101,6 +106,9 @@ export const BookingContainer = () => {
     if (bookingData?.car?.id) {
       setTargetCarId(bookingData.car.id);
     }
+    if (bookingData?.bookingType) {
+      setBookingType(bookingData.bookingType);
+    }
   }, [bookingData]);
 
   // Populate dates from booking data when editing
@@ -111,13 +119,22 @@ export const BookingContainer = () => {
       const rawEnd = searchParams.get('end');
       
       if (!rawStart && !rawEnd && bookingData.startDate && bookingData.endDate) {
-        const start = new Date(bookingData.startDate);
-        const end = new Date(bookingData.endDate);
-        
-        setStartDate(start.toISOString().split('T')[0]);
-        setEndDate(end.toISOString().split('T')[0]);
-        setStartTime(bookingData.pickupTime || '10:00');
-        setEndTime(bookingData.returnTime || '10:00');
+        const startRaw = bookingData.startDate as any;
+        const endRaw = bookingData.endDate as any;
+
+        const normalizeDate = (value: any) => {
+          if (!value) return '';
+          if (typeof value === 'string') {
+            const datePart = value.split('T')[0];
+            if (datePart && /^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart;
+          }
+          return '';
+        };
+
+        setStartDate(normalizeDate(startRaw));
+        setEndDate(normalizeDate(endRaw));
+        setStartTime(bookingData.pickupTime);
+        setEndTime(bookingData.returnTime);
       }
     }
   }, [bookingData, bookingId, searchParams]);
@@ -158,19 +175,28 @@ export const BookingContainer = () => {
 
   const handleConfirmAction = async () => {
     try {
+      const isAdmin = userData?.me?.role === 'ADMIN';
+      if (isAdmin && isWalkIn) {
+        if (!guestName.trim() || !guestPhone.trim()) {
+          alert('Guest name and phone are required for walk-in bookings.');
+          return;
+        }
+      }
+
       if (isEditMode && bookingId) {
         // UPDATE EXISTING BOOKING
         await updateBooking({ 
           variables: { 
             id: bookingId, 
             input: { 
-              startDate: new Date(startDateTime).toISOString(), 
-              endDate: new Date(endDateTime).toISOString(), 
+              startDate: `${startDate}T00:00:00.000Z`, 
+              endDate: `${endDate}T00:00:00.000Z`, 
               pickupTime: startTime, 
               returnTime: endTime,
               basePrice: priceDetails?.basePrice,
               taxAmount: priceDetails?.taxAmount, 
-              totalPrice: priceDetails?.totalPrice
+              totalPrice: priceDetails?.totalPrice,
+              bookingType
             } 
           } 
         });
@@ -178,11 +204,16 @@ export const BookingContainer = () => {
         router.push('/bookingRecords');
       } else {
         // CREATE NEW BOOKING
-        const { data: bRes } = await createBooking({ variables: { input: { carId: targetCarId, startDate: new Date(startDateTime).toISOString(), endDate: new Date(endDateTime).toISOString(), pickupTime: startTime, returnTime: endTime, basePrice: priceDetails?.basePrice, taxAmount: priceDetails?.taxAmount, totalPrice: priceDetails?.totalPrice, depositAmount: priceDetails?.deposit, bookingType: 'RENTAL' } } });
+        const { data: bRes } = await createBooking({ variables: { input: { carId: targetCarId, startDate: `${startDate}T00:00:00.000Z`, endDate: `${endDate}T00:00:00.000Z`, pickupTime: startTime, returnTime: endTime, basePrice: priceDetails?.basePrice, taxAmount: priceDetails?.taxAmount, totalPrice: priceDetails?.totalPrice, depositAmount: priceDetails?.deposit, bookingType: isAdmin ? bookingType : 'RENTAL', isWalkIn: isAdmin ? isWalkIn : false, guestName: isWalkIn ? guestName : undefined, guestPhone: isWalkIn ? guestPhone : undefined, guestEmail: isWalkIn ? guestEmail : undefined } } });
         const bId = bRes.createBooking.id;
-        const { data: confirmData } = await confirmReservation({ variables: { id: bId } });
-        setConfirmedBookingData(confirmData.confirmReservation);
-        setEmailVerificationPopup(true);
+        if (isAdmin && isWalkIn) {
+          // For onsite admin bookings, skip customer verification flow
+          router.push('/bookingRecords');
+        } else {
+          const { data: confirmData } = await confirmReservation({ variables: { id: bId } });
+          setConfirmedBookingData(confirmData.confirmReservation);
+          setEmailVerificationPopup(true);
+        }
       }
     } catch (e: any) { alert(e.message); }
   };
@@ -242,6 +273,18 @@ export const BookingContainer = () => {
       availableCarsData={availableCarsData} 
       startDateTime={startDateTime} 
       endDateTime={endDateTime}
+      validationError={validationError}
+      isAdmin={userData?.me?.role === 'ADMIN'}
+      bookingType={bookingType}
+      setBookingType={setBookingType}
+      isWalkIn={isWalkIn}
+      setIsWalkIn={setIsWalkIn}
+      guestName={guestName}
+      setGuestName={setGuestName}
+      guestPhone={guestPhone}
+      setGuestPhone={setGuestPhone}
+      guestEmail={guestEmail}
+      setGuestEmail={setGuestEmail}
       emailVerificationPopup={emailVerificationPopup} 
       confirmedBookingData={confirmedBookingData} 
       verificationTimer={verificationTimer} 

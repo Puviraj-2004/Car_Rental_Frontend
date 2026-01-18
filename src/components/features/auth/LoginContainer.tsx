@@ -26,6 +26,14 @@ export const LoginContainer = () => {
     const result = await loginWithCredentials(formData);
 
     if (result?.error) {
+      const msg = String(result.error);
+      if (/verify/i.test(msg)) {
+        // Redirect to OTP verification if backend blocks unverified users
+        setError('Please verify your email to continue. Redirecting...');
+        setLoading(false);
+        router.push(`/verify-otp?email=${encodeURIComponent(formData.email)}`);
+        return;
+      }
       setError('Invalid email or password. Please try again.');
       setLoading(false);
     } else {

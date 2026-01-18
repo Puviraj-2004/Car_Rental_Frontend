@@ -10,7 +10,12 @@ import {
   CANCEL_BOOKING_MUTATION // Ensure this exists in your mutations file
 } from '@/lib/graphql/mutations';
 
-export const useAdminBookings = () => {
+type BookingFilterOptions = {
+  bookingType?: 'RENTAL' | 'REPLACEMENT';
+  walkInOnly?: boolean;
+};
+
+export const useAdminBookings = (filterOptions?: BookingFilterOptions) => {
   const { data, loading, error, refetch } = useQuery(GET_ALL_BOOKINGS_QUERY, {
     fetchPolicy: 'cache-and-network',
   });
@@ -31,6 +36,10 @@ export const useAdminBookings = () => {
   // 2. Apply Search & Status Filter
   const filteredBookings = useMemo(() => {
     return rawBookings.filter((b: any) => {
+      // Pre-filter by view
+      if (filterOptions?.bookingType && b.bookingType !== filterOptions.bookingType) return false;
+      if (filterOptions?.walkInOnly && !b.isWalkIn) return false;
+
       // Status Filter
       if (statusFilter !== 'ALL' && b.status !== statusFilter) return false;
 
@@ -58,6 +67,22 @@ export const useAdminBookings = () => {
     }
   };
 
+  // Handle Start Trip with Odometer
+  const handleStartTrip = async (bookingId: string, startOdometer?: number, pickupNotes?: string) => {
+    try {
+      await startTrip({ 
+        variables: { 
+          bookingId,
+          ...(startOdometer !== undefined && { startOdometer }),
+          ...(pickupNotes && { pickupNotes })
+        } 
+      });
+      return true;
+    } catch (e: any) {
+      throw new Error(e.message || 'Failed to start trip');
+    }
+  };
+
   return {
     bookings: filteredBookings,
     totalCount: rawBookings.length,
@@ -70,7 +95,7 @@ export const useAdminBookings = () => {
     setStatusFilter,
     actions: { 
       updateStatus, 
-      startTrip, 
+      startTrip: handleStartTrip, // Use wrapper with odometer support
       completeTrip, 
       verifyDoc, 
       finishMaintenance,

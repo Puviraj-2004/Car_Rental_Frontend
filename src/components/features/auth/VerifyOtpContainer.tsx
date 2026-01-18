@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useVerifyOtp } from '@/hooks/graphql/useVerifyOtp';
+import { useResendOtp } from '@/hooks/graphql/useResendOtp';
 import { VerifyOtpView } from './VerifyOtpView';
 
 export const VerifyOtpContainer = () => {
@@ -13,6 +14,8 @@ export const VerifyOtpContainer = () => {
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendSuccess, setResendSuccess] = useState('');
 
   const onCompleted = (data: any) => {
     if (data.verifyOTP.success) {
@@ -27,7 +30,32 @@ export const VerifyOtpContainer = () => {
     setError(err.message || 'Verification failed. Please check the code.');
   };
 
+  const onResendCompleted = (data: any) => {
+    if (data.resendOTP.success) {
+      setResendSuccess('OTP sent to your email!');
+      setError('');
+      setResendCooldown(60); // 60 second cooldown
+      setTimeout(() => setResendSuccess(''), 3000);
+    }
+  };
+
+  const onResendError = (err: any) => {
+    setError(err.message || 'Failed to resend OTP.');
+  };
+
   const { executeVerify, loading } = useVerifyOtp(onCompleted, onError);
+  const { executeResend, loading: resendLoading } = useResendOtp(onResendCompleted, onResendError);
+
+  // Cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    
+    const timer = setInterval(() => {
+      setResendCooldown(prev => prev - 1);
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   const handleOtpChange = (value: string, index: number) => {
     if (isNaN(Number(value))) return;
@@ -58,16 +86,27 @@ export const VerifyOtpContainer = () => {
     executeVerify(email, fullOtp);
   };
 
+  const handleResend = () => {
+    if (resendCooldown > 0 || !email) return;
+    setError('');
+    setResendSuccess('');
+    executeResend(email);
+  };
+
   return (
     <VerifyOtpView
       email={email}
       otp={otp}
       error={error}
       success={success}
+      resendSuccess={resendSuccess}
       loading={loading}
+      resendLoading={resendLoading}
+      resendCooldown={resendCooldown}
       onOtpChange={handleOtpChange}
       onKeyDown={handleKeyDown}
       onSubmit={handleSubmit}
+      onResend={handleResend}
     />
   );
 };

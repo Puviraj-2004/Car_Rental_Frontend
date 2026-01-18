@@ -16,14 +16,20 @@ const AdminBookingDetailsModal = dynamic(
   }
 );
 
-export const AdminBookingsContainer = () => {
+type ViewFilter = {
+  label?: string;
+  bookingType?: 'RENTAL' | 'REPLACEMENT';
+  walkInOnly?: boolean;
+};
+
+export const AdminBookingsContainer = ({ viewFilter }: { viewFilter?: ViewFilter }) => {
   const router = useRouter();
   const { 
     bookings, loading, error, 
     searchQuery, setSearchQuery, 
     statusFilter, setStatusFilter,
     actions 
-  } = useAdminBookings();
+  } = useAdminBookings({ bookingType: viewFilter?.bookingType, walkInOnly: viewFilter?.walkInOnly });
 
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -52,6 +58,7 @@ export const AdminBookingsContainer = () => {
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
         onCreateClick={handleCreateClick}
+        viewLabel={viewFilter?.label}
       />
       {modalOpen && (
         <AdminBookingDetailsModal 

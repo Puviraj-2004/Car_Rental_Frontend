@@ -20,14 +20,16 @@ export const BookingView = ({
   checkingAvailability, isCarAvailable, hasDates, priceDetails, 
   platformData, createBookingLoading, confirmReservationLoading, updateBookingLoading,
   changeCarDialog, setChangeCarDialog, availableCarsLoading, availableCarsData, startDateTime, endDateTime,
-  emailVerificationPopup, confirmedBookingData, verificationTimer, copySuccess, handleCopyLink, onConfirmAction,
-  isEditMode // Received from container
+  validationError, emailVerificationPopup, confirmedBookingData, verificationTimer, copySuccess, handleCopyLink, onConfirmAction,
+  isEditMode, isAdmin, bookingType, setBookingType, isWalkIn, setIsWalkIn, guestName, setGuestName, guestPhone, setGuestPhone, guestEmail, setGuestEmail // Received from container
  }: any) => {
 
   // Logic based on isEditMode prop
   const backButtonRoute = isEditMode ? '/bookingRecords' : '/cars';
   const backButtonText = isEditMode ? 'Back to Records' : 'Back to Fleet';
-  const mainActionButtonText = isEditMode ? 'Update Booking' : 'Confirm Reservation';
+  const mainActionButtonText = isEditMode ? 'Update Booking' : (isAdmin && isWalkIn ? 'Save Walk-In' : 'Confirm Reservation');
+
+  const walkInMissing = isAdmin && isWalkIn && (!guestName?.trim() || !guestPhone?.trim());
 
   return (
     <Box sx={{ bgcolor: '#F8FAFC', minHeight: '100vh', pb: 12 }}>
@@ -79,6 +81,11 @@ export const BookingView = ({
                     </Stack>
                   </Grid>
                 </Grid>
+                {validationError && (
+                  <Alert severity="warning" sx={{ mt: 3 }}>
+                    {validationError}
+                  </Alert>
+                )}
                 {!isCarAvailable && hasDates && (
                   <Alert severity="error" sx={{ mt: 3 }} action={<Button color="error" size="small" onClick={() => setChangeCarDialog(true)}>Change Car</Button>}>
                     Car Unavailable for selected dates.
@@ -128,6 +135,42 @@ export const BookingView = ({
           <Grid item xs={12} md={5} lg={4}>
             <Paper elevation={0} sx={{ p: 4, borderRadius: 4, bgcolor: 'white', border: '1px solid #E2E8F0', position: 'sticky', top: 100 }}>
                <Typography variant="h6" fontWeight={800} mb={3}>Payment Summary</Typography>
+
+               {isAdmin && (
+                 <Box sx={{ mb: 3, p: 2, border: '1px solid #E2E8F0', borderRadius: 2, bgcolor: '#F8FAFC' }}>
+                   <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+                     <Chip label="Admin" size="small" color="primary" />
+                    <Typography fontWeight={700}>Admin Booking Options</Typography>
+                   </Stack>
+                   <Stack spacing={1.5}>
+                    <TextField
+                      size="small"
+                      select
+                      label="Booking Type"
+                      value={bookingType}
+                      onChange={(e) => setBookingType(e.target.value)}
+                      fullWidth
+                    >
+                      <MenuItem value="RENTAL">Rental</MenuItem>
+                      <MenuItem value="REPLACEMENT">Courtesy</MenuItem>
+                    </TextField>
+
+                     <Stack direction="row" alignItems="center" spacing={1}>
+                       <input type="checkbox" checked={isWalkIn} onChange={(e) => setIsWalkIn(e.target.checked)} aria-label="Walk-in toggle" />
+                       <Typography variant="body2">Mark as walk-in (no customer account)</Typography>
+                     </Stack>
+                     {isWalkIn && (
+                       <Stack spacing={1}>
+                         <TextField size="small" label="Guest Name" value={guestName} onChange={(e) => setGuestName(e.target.value)} fullWidth />
+                         <TextField size="small" label="Guest Phone" value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} fullWidth />
+                         <TextField size="small" label="Guest Email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} fullWidth />
+                         {walkInMissing && <Alert severity="warning" sx={{ mt: 1 }}>Guest name and phone are required.</Alert>}
+                       </Stack>
+                     )}
+                   </Stack>
+                 </Box>
+               )}
+
                {priceDetails ? (
                  <Stack spacing={2.5}>
                     <Box display="flex" justifyContent="space-between"><Typography color="text.secondary">Rental ({priceDetails.durationLabel})</Typography><Typography fontWeight={700}>€{priceDetails.basePrice.toFixed(2)}</Typography></Box>
@@ -145,7 +188,7 @@ export const BookingView = ({
                       variant="contained" 
                       size="large" 
                       onClick={onConfirmAction} 
-                      disabled={!isCarAvailable || createBookingLoading || confirmReservationLoading || updateBookingLoading} 
+                      disabled={!isCarAvailable || !!validationError || createBookingLoading || confirmReservationLoading || updateBookingLoading || walkInMissing} 
                       sx={{ mt: 1, bgcolor: '#0F172A', py: 1.5, fontWeight: 800 }}
                     >
                       {mainActionButtonText}
