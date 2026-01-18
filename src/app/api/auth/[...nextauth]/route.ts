@@ -16,7 +16,7 @@ const handler = NextAuth({
       },
       async authorize(credentials) {
         try {
-          // ⚠️ API URL சரியாக இருப்பதை உறுதி செய்யவும்
+          // ⚠️ Ensure API URL is correct
           const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/graphql";
           
           const res = await fetch(apiUrl, {
@@ -27,7 +27,7 @@ const handler = NextAuth({
                 mutation Login($input: LoginInput!) {
                   login(input: $input) {
                     token
-                    user { id email username role phoneNumber isEmailVerified }
+                    user { id email fullName role phoneNumber avatarUrl }
                   }
                 }
               `,
@@ -75,7 +75,7 @@ const handler = NextAuth({
                 mutation GoogleLogin($idToken: String!) {
                   googleLogin(idToken: $idToken) {
                     token
-                    user { id email username role }
+                    user { id email fullName role }
                   }
                 }
               `,
@@ -84,30 +84,42 @@ const handler = NextAuth({
           });
 
           const { data } = await res.json();
+
           if (data?.googleLogin) {
             token.accessToken = data.googleLogin.token;
             token.role = data.googleLogin.user.role;
-            token.username = data.googleLogin.user.username;
+            token.fullName = data.googleLogin.user.fullName;
+            token.id = data.googleLogin.user.id;
           }
         } catch (error) {
-          console.error("NextAuth Google sync error:", error);
+          console.error("❌ NextAuth Google sync error:", error);
         }
       }
 
       if (user) {
-        token.accessToken = user.accessToken;
-        token.role = user.role;
-        token.username = user.username;
-        token.id = user.id;
+        // Only set values if not already set (e.g., from Google/Email login backend response)
+        if (!token.accessToken && user.accessToken) {
+          token.accessToken = user.accessToken;
+        }
+        if (!token.role && user.role) {
+          token.role = user.role;
+        }
+        if (!token.fullName && user.fullName) {
+          token.fullName = user.fullName;
+        }
+        if (!token.id && user.id) {
+          token.id = user.id;
+        }
       }
+
       return token;
     },
     async session({ session, token }: any) {
       if (token) {
         session.accessToken = token.accessToken;
         session.user.role = token.role;
-        session.user.username = token.username;
-        session.user.id = token.id;
+        session.user.fullName = token.fullName;
+        session.user.id = token.id || token.sub; // Use sub for Google users if id not set
       }
       return session;
     }

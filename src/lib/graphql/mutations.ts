@@ -9,7 +9,7 @@ export const REGISTER_MUTATION = gql`
       token
       user {
         id
-        username
+        fullName
         email
         phoneNumber
         role
@@ -26,7 +26,7 @@ export const LOGIN_MUTATION = gql`
       token
       user {
         id
-        username
+        fullName
         email
         phoneNumber
         role
@@ -43,7 +43,7 @@ export const GOOGLE_LOGIN_MUTATION = gql`
       token
       user {
         id
-        username
+        fullName
         email
         role
       }
@@ -101,7 +101,12 @@ export const UPDATE_CAR_MUTATION = gql`
   mutation UpdateCar($id: ID!, $input: UpdateCarInput!) {
     updateCar(id: $id, input: $input) {
       id
+      brand { name }
+      model { name }
       status
+      dailyKmLimit
+      extraKmCharge
+      currentOdometer
       updatedAt
     }
   }
@@ -119,7 +124,7 @@ export const ADD_CAR_IMAGE_MUTATION = gql`
   mutation AddCarImage($carId: ID!, $file: Upload!, $isPrimary: Boolean) {
     addCarImage(carId: $carId, file: $file, isPrimary: $isPrimary) {
       id
-      imagePath
+      url
     }
   }
 `;
@@ -145,12 +150,125 @@ export const CREATE_BOOKING_MUTATION = gql`
       status
       totalPrice
       depositAmount
+      bookingType
+      repairOrderId
+    }
+  }
+`;
+
+export const CONFIRM_RESERVATION_MUTATION = gql`
+  mutation ConfirmReservation($id: ID!) {
+    confirmReservation(id: $id) {
+      id
+      status
+      verification {
+        id
+        token
+        expiresAt
+        isVerified
+      }
+      startDate
+      endDate
+      totalPrice
+      car {
+        brand { name }
+        model { name }
+        plateNumber
+      }
+      user {
+        fullName
+        email
+      }
+    }
+  }
+`;
+
+export const CONFIRM_BOOKING_MUTATION = gql`
+  mutation ConfirmBooking($bookingId: String!) {
+    confirmBooking(bookingId: $bookingId) {
+      success
+      message
+      booking {
+        id
+        status
+        startDate
+        endDate
+        totalPrice
+        rentalType
+        bookingType
+        verification {
+          token
+          expiresAt
+        }
+      }
+    }
+  }
+`;
+
+export const RESEND_VERIFICATION_LINK_MUTATION = gql`
+  mutation ResendVerificationLink($bookingId: String!) {
+    resendVerificationLink(bookingId: $bookingId) {
+      success
+      message
+      expiresAt
+    }
+  }
+`;
+
+export const CREATE_OR_UPDATE_VERIFICATION_MUTATION = gql`
+  mutation CreateOrUpdateVerification($input: DocumentVerificationInput!) {
+    createOrUpdateVerification(input: $input) {
+      bookingId
+      booking{
+        id 
+        user{
+          id 
+          fullName
+        }
+      }
+      licenseFrontUrl
+      licenseBackUrl
+      idCardUrl
+      idCardBackUrl
+      addressProofUrl
+      licenseNumber
+      licenseExpiry
+      licenseIssueDate
+      driverDob
+      licenseCategories
+      idNumber
+      idExpiry
+      verifiedAddress
+      status
+    }
+  }
+`;
+
+export const CREATE_STRIPE_CHECKOUT_SESSION_MUTATION = gql`
+  mutation CreateStripeCheckoutSession($bookingId: String!) {
+    createStripeCheckoutSession(bookingId: $bookingId) {
+      url
+      sessionId
+    }
+  }
+`;
+
+export const MOCK_FINALIZE_PAYMENT_MUTATION = gql`
+  mutation MockFinalizePayment($bookingId: String!, $success: Boolean!) {
+    mockFinalizePayment(bookingId: $bookingId, success: $success) {
+      id
+      status
+      amount
+      booking {
+        id
+        status
+      }
     }
   }
 `;
 
 export const SEND_VERIFICATION_LINK_MUTATION = gql`
-  mutation SendBookingVerificationLink($bookingId: ID!) {
+  mutation SendBookingVerificationLink($bookingId: String!) {
     sendBookingVerificationLink(bookingId: $bookingId) {
       success
       message
@@ -164,6 +282,39 @@ export const VERIFY_BOOKING_TOKEN_MUTATION = gql`
       success
       message
       bookingId
+    }
+  }
+`;
+
+export const UPDATE_BOOKING_MUTATION = gql`
+  mutation UpdateBooking($id: ID!, $input: UpdateBookingInput!) {
+    updateBooking(id: $id, input: $input) {
+      id
+      startDate
+      endDate
+      pickupTime
+      returnTime
+      status
+      basePrice
+      taxAmount
+      totalPrice
+      car {
+        id
+        brand { name }
+        model { name }
+        plateNumber
+        fuelType
+        transmission
+        requiredLicense
+        dailyKmLimit
+        extraKmCharge
+        pricePerDay
+        depositAmount
+        images {
+          url
+          isPrimary
+        }
+      }
     }
   }
 `;
@@ -183,7 +334,52 @@ export const CANCEL_BOOKING_MUTATION = gql`
   }
 `;
 
-// --- 💳 PAYMENT ---
+export const PROCESS_DOCUMENT_OCR_MUTATION = gql`
+  mutation ProcessDocumentOCR($file: Upload!, $documentType: DocumentType, $side: DocumentSide) {
+    processDocumentOCR(file: $file, documentType: $documentType, side: $side) {
+      firstName
+      lastName
+      fullName
+      documentId
+      licenseNumber
+      expiryDate
+      issueDate
+      birthDate
+      address
+      licenseCategories
+      restrictsToAutomatic
+      isQuotaExceeded
+      fallbackUsed
+    }
+  }
+`;
+
+// --- 📏 METER TRACKING & KM MANAGEMENT ---
+
+export const UPDATE_METER_READINGS_MUTATION = gql`
+  mutation UpdateMeterReadings($bookingId: String!, $input: UpdateMeterReadingInput!) {
+    updateMeterReadings(bookingId: $bookingId, input: $input) {
+      id
+      startMeter
+      endMeter
+      status
+    }
+  }
+`;
+
+export const FINALIZE_BOOKING_RETURN_MUTATION = gql`
+  mutation FinalizeBookingReturn($bookingId: String!) {
+    finalizeBookingReturn(bookingId: $bookingId) {
+      id
+      endMeter
+      extraKmFee
+      totalFinalPrice
+      status
+    }
+  }
+`;
+
+// --- PAYMENT ---
 
 export const CREATE_PAYMENT_MUTATION = gql`
   mutation CreatePayment($input: CreatePaymentInput!) {
@@ -199,46 +395,24 @@ export const CREATE_PAYMENT_MUTATION = gql`
   }
 `;
 
-// --- 🪪 DRIVER PROFILE (KYC) ---
-
-export const CREATE_DRIVER_PROFILE_MUTATION = gql`
-  mutation CreateOrUpdateDriverProfile($input: DriverProfileInput!) {
-    createOrUpdateDriverProfile(input: $input) {
-      id
-      status
-      licenseNumber
-      verificationNote
-    }
-  }
-`;
-
-export const VERIFY_DRIVER_PROFILE_MUTATION = gql`
-  mutation VerifyDriverProfile($userId: ID!, $status: VerificationStatus!, $note: String) {
-    verifyDriverProfile(userId: $userId, status: $status, note: $note) {
-      id
-      userId
-      status
-      verificationNote
-    }
-  }
-`;
-
-// --- 🏷️ INVENTORY (BRAND & MODEL) ---
+// --- INVENTORY (BRAND & MODEL) ---
 
 export const CREATE_BRAND_MUTATION = gql`
-  mutation CreateBrand($name: String!, $logoUrl: String, $logoPublicId: String) {
-    createBrand(name: $name, logoUrl: $logoUrl, logoPublicId: $logoPublicId) {
+  mutation CreateBrand($name: String!, $logoUrl: String) {
+    createBrand(name: $name, logoUrl: $logoUrl) {
       id
       name
+      logoUrl
     }
   }
 `;
 
 export const UPDATE_BRAND_MUTATION = gql`
-  mutation UpdateBrand($id: ID!, $name: String!, $logoUrl: String, $logoPublicId: String) {
-    updateBrand(id: $id, name: $name, logoUrl: $logoUrl, logoPublicId: $logoPublicId) {
+  mutation UpdateBrand($id: ID!, $name: String!, $logoUrl: String) {
+    updateBrand(id: $id, name: $name, logoUrl: $logoUrl) {
       id
       name
+      logoUrl
     }
   }
 `;
@@ -279,7 +453,7 @@ export const UPDATE_USER_MUTATION = gql`
   mutation UpdateUser($input: UpdateUserInput!) {
     updateUser(input: $input) {
       id
-      username
+      fullName
       phoneNumber
     }
   }
@@ -290,3 +464,51 @@ export const DELETE_USER_MUTATION = gql`
     deleteUser(id: $id)
   }
 `;
+
+export const START_TRIP_MUTATION = gql`
+  mutation StartTrip($bookingId: String!) {
+    startTrip(bookingId: $bookingId) {
+      id
+      status
+      car {
+        id
+        status
+      }
+    }
+  }
+`;
+
+export const COMPLETE_TRIP_MUTATION = gql`
+  mutation CompleteTrip($bookingId: String!) {
+    completeTrip(bookingId: $bookingId) {
+      id
+      status
+      car {
+        id
+        status
+      }
+    }
+  }
+`;
+
+export const FINISH_CAR_MAINTENANCE_MUTATION = gql`
+  mutation FinishCarMaintenance($carId: ID!) {
+    finishCarMaintenance(carId: $carId) {
+      id
+      status
+    }
+  }
+`;
+
+export const VERIFY_DRIVER_PROFILE_MUTATION = gql`
+  mutation VerifyDocument($userId: ID!, $status: VerificationStatus!, $reason: String) {
+    verifyDocument(userId: $userId, status: $status, reason: $reason) {
+      id
+      status
+    }
+  }
+`;
+
+
+
+

@@ -1,21 +1,27 @@
-// src/app/providers.tsx
 'use client';
 
 import React from 'react';
+import { SessionProvider } from "next-auth/react";
 import { ApolloProvider } from '@apollo/client';
-import client from '@/lib/apolloClient';
-import { ThemeProvider } from '@mui/material/styles';
-import theme from '@/lib/theme';
-import CssBaseline from '@mui/material/CssBaseline';
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v13-appRouter';
-import { SessionProvider } from "next-auth/react"; // ✅ Import this
+import { ThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+
+import client from '@/lib/apolloClient';
+import theme from '@/lib/theme';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <SessionProvider> {/* ✅ Wrap everything with SessionProvider */}
+    // ⚡ PERFORMANCE FIX: Prevents auto-refetching session on window focus
+    <SessionProvider 
+      refetchOnWindowFocus={false}    
+      refetchWhenOffline={false}  
+      refetchInterval={0}    
+    >
       <ApolloProvider client={client}>
-        <AppRouterCacheProvider>
+        <AppRouterCacheProvider options={{ enableCssLayer: true }}>
           <ThemeProvider theme={theme}>
+            {/* CssBaseline kickstarts an elegant, consistent, and simple baseline to build upon. */}
             <CssBaseline />
             {children}
           </ThemeProvider>

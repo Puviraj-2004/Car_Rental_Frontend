@@ -1,4 +1,3 @@
-// src/middleware.ts
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
@@ -30,10 +29,11 @@ export default withAuth(
         const { pathname } = req.nextUrl;
 
         if (
-          pathname === "/" || 
-          pathname === "/login" || 
+          pathname === "/" ||
+          pathname === "/login" ||
           pathname === "/register" ||
-          pathname.startsWith("/cars") 
+          pathname.startsWith("/cars") ||
+          pathname.startsWith("/verification/")
         ) {
           return true;
         }
