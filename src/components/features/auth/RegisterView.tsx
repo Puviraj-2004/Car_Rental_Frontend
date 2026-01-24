@@ -4,12 +4,13 @@ import React from 'react';
 import Image from 'next/image';
 import { 
   Box, Typography, TextField, Button, Grid, Alert, InputAdornment, 
-  Checkbox, FormControlLabel, Link, CircularProgress, Stack, IconButton, Divider
+  Checkbox, FormControlLabel, Link, CircularProgress, Stack, IconButton, Container
 } from '@mui/material';
 import { 
   EmailOutlined, LockOutlined, PersonOutline, PhoneOutlined, 
-  Visibility, VisibilityOff, ArrowForward
+  Visibility, VisibilityOff, ArrowBack
 } from '@mui/icons-material';
+import NextLink from 'next/link';
 
 interface RegisterViewProps {
   formData: any;
@@ -31,9 +32,13 @@ interface RegisterViewProps {
 const COLORS = {
   primary: '#0F172A',
   accent: '#3B82F6',
-  inputBg: '#F8FAFC',
-  textSub: '#64748B',
+  darkBg: '#0F172A',
+  cardBg: '#1E293B',
+  inputBg: 'rgba(255, 255, 255, 0.05)',
+  textPrimary: '#FFFFFF',
+  textSub: 'rgba(255, 255, 255, 0.6)',
   success: '#10B981',
+  border: 'rgba(255, 255, 255, 0.1)',
 };
 
 export const RegisterView = ({
@@ -55,152 +60,165 @@ export const RegisterView = ({
 
   const inputStyles = {
     '& .MuiOutlinedInput-root': {
-      borderRadius: '12px',
+      borderRadius: '10px',
       backgroundColor: COLORS.inputBg,
-      transition: 'all 0.3s ease',
-      '& fieldset': { border: '1px solid #E2E8F0' },
+      color: COLORS.textPrimary,
+      transition: 'all 0.2s ease-in-out',
+      '& fieldset': { border: `1.5px solid ${COLORS.border}` },
       '&:hover fieldset': { borderColor: COLORS.accent },
-      '&.Mui-focused fieldset': { borderColor: COLORS.accent },
+      '&.Mui-focused fieldset': { borderColor: COLORS.accent, borderWidth: '1.5px' },
     },
-    '& input': { padding: '12px 14px', fontSize: '0.9rem' }
+    '& input': { padding: '10px 12px', fontSize: '0.85rem', color: COLORS.textPrimary },
+    '& input::placeholder': { color: 'rgba(255, 255, 255, 0.4)', opacity: 1 },
+    '& .MuiFormHelperText-root': { mx: 0, mt: 0.2, fontSize: '0.7rem', color: '#EF4444' }
   };
 
   return (
-    <Box sx={{ height: '100vh', width: '100vw', overflow: 'hidden', bgcolor: '#FFFFFF' }}>
+    <Box sx={{ height: '100vh', width: '100vw', overflow: 'hidden', bgcolor: COLORS.darkBg, position: 'relative' }}>
+      <IconButton
+        component={NextLink}
+        href="/"
+        sx={{
+          position: 'absolute', top: 20, left: 20, zIndex: 10,
+          bgcolor: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(8px)',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.15)', transform: 'scale(1.05)' },
+        }}
+      >
+        <ArrowBack sx={{ fontSize: 20, color: COLORS.textPrimary }} />
+      </IconButton>
+
       <Grid container sx={{ height: '100%' }}>
-        
-        {/* Left Side - Hero Image Section */}
-        <Grid item xs={0} md={6} lg={7} sx={{ 
-          display: { xs: 'none', md: 'block' }, 
-          position: 'relative',
-          height: '100%'
-        }}>
-          <Image 
-            src="/images/auth/register-hero.jpg"
-            alt="Luxury Car" 
-            fill 
-            style={{ objectFit: 'cover' }}
-            priority
-          />
-          
-          {/* Overlay for Premium Look Text */}
+        <Grid item xs={0} md={6} lg={7} sx={{ display: { xs: 'none', md: 'block' }, position: 'relative' }}>
+          <Image src="/images/auth/register-hero.jpg" alt="Interior" fill style={{ objectFit: 'cover' }} priority />
           <Box sx={{ 
-            position: 'absolute', 
-            top: 0, left: 0, right: 0, bottom: 0,
-            background: 'linear-gradient(to bottom, rgba(15,23,42,0.7) 0%, rgba(15,23,42,0.2) 40%, rgba(15,23,42,0.7) 100%)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            p: 8
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(to top, rgba(15,23,42,0.9) 0%, rgba(15,23,42,0.2) 60%)',
+            display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', p: { md: 6, lg: 10 }
           }}>
-            <Typography variant="h2" fontWeight={800} sx={{ color: 'white', mb: 1, letterSpacing: '-1px', lineHeight: 1.1 }}>
-              Experience <br /> Pure Luxury.
-            </Typography>
-            <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.8)', fontWeight: 400, maxWidth: '400px' }}>
-              Drive the elite fleet. Book your dream car in seconds.
-            </Typography>
-          </Box>
-
-          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', position: 'absolute', bottom: 30, left: 60 }}>
-            © 2026 RentCar Premium.
-          </Typography>
-        </Grid>
-
-        {/* Right Side - Scrollable Registration Form */}
-        <Grid item xs={12} md={6} lg={5} sx={{ 
-          height: '100%', 
-          overflowY: 'auto', 
-          display: 'flex', 
-          flexDirection: 'column',
-          bgcolor: '#FFFFFF'
-        }}>
-          <Box sx={{ p: { xs: 4, md: 6, lg: 8 }, maxWidth: '500px', mx: 'auto', width: '100%' }}>
-            
-            <Box sx={{ mb: 4 }}>
-              <Typography variant="h4" fontWeight={800} color={COLORS.primary} sx={{ mb: 1 }}>
-                Create Account
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="h1" fontWeight={900} sx={{ color: 'white', mb: 1, letterSpacing: '-1.5px', fontSize: { md: '2.5rem', lg: '3.5rem' }, lineHeight: 1.1 }}>
+                Unlock <br /> The Fleet.
               </Typography>
-              <Typography variant="body2" color={COLORS.textSub}>
-                Join our community of premium travelers.
+              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 300, maxWidth: '350px' }}>
+                Join our exclusive community and start your premium journey today.
               </Typography>
             </Box>
+            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', letterSpacing: '1px' }}>LUXE SERIES © 2026</Typography>
+          </Box>
+        </Grid>
 
-            {error && (
-              <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{error}</Alert>
-            )}
+        <Grid item xs={12} md={6} lg={5} sx={{ 
+          height: '100%', 
+          display: 'flex', 
+          alignItems: { xs: 'flex-start', md: 'center' }, 
+          justifyContent: 'center',
+          px: { xs: 3, sm: 4, md: 2 },
+          py: { xs: 0, md: 0 },
+          pt: { xs: 10, md: 0 },
+          bgcolor: COLORS.darkBg
+        }}>
+          <Container maxWidth="xs" sx={{ px: { xs: 0, sm: 2 } }}>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="h6" fontWeight={800} color={COLORS.textPrimary} sx={{ lineHeight: 1.2 }}>Create Account</Typography>
+              <Typography variant="caption" color={COLORS.textSub}>Fill in your details to get started.</Typography>
+            </Box>
+
+            {error && <Alert severity="error" sx={{ mb: 2, borderRadius: '8px', py: 0, fontSize: '0.75rem' }}>{error}</Alert>}
 
             <form onSubmit={onSubmit} autoComplete="off">
-              <Stack spacing={2.5}>
-                <Box>
-                  <Typography variant="caption" fontWeight={700} sx={{ mb: 0.5, display: 'block', color: COLORS.primary }}>Full Name</Typography>
-                  <TextField fullWidth placeholder="John Doe" sx={inputStyles} autoComplete="off" value={formData.fullName} onChange={(e) => setFormData({...formData, fullName: e.target.value})} 
-                    InputProps={{ startAdornment: <InputAdornment position="start"><PersonOutline fontSize="small" /></InputAdornment> }} 
-                  />
-                </Box>
+              <Stack spacing={1.2}>
+                {/* Two Column Row for Name and Phone */}
+                <Grid container spacing={1.2}>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" fontWeight={700} sx={{ mb: 0.3, display: 'block', color: COLORS.textPrimary }}>FULL NAME</Typography>
+                    <TextField fullWidth placeholder="John Doe" sx={inputStyles} value={formData.fullName}
+                      autoComplete="off"
+                      name="register-fullname"
+                      onChange={(e) => setFormData({...formData, fullName: e.target.value})} 
+                      InputProps={{ startAdornment: <InputAdornment position="start"><PersonOutline sx={{ fontSize: 18, color: COLORS.textSub }} /></InputAdornment> }} 
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" fontWeight={700} sx={{ mb: 0.3, display: 'block', color: COLORS.textPrimary }}>PHONE</Typography>
+                    <TextField fullWidth placeholder="+1..." sx={inputStyles} value={formData.phoneNumber}
+                      autoComplete="off"
+                      name="register-phone"
+                      onChange={(e) => onPhoneChange ? onPhoneChange(e.target.value) : setFormData({...formData, phoneNumber: e.target.value})} 
+                      InputProps={{ startAdornment: <InputAdornment position="start"><PhoneOutlined sx={{ fontSize: 18, color: COLORS.textSub }} /></InputAdornment> }} 
+                    />
+                  </Grid>
+                </Grid>
 
                 <Box>
-                  <Typography variant="caption" fontWeight={700} sx={{ mb: 0.5, display: 'block', color: COLORS.primary }}>Email Address</Typography>
-                  <TextField fullWidth placeholder="name@company.com" sx={inputStyles} autoComplete="off" value={formData.email} error={!!fieldErrors?.email} helperText={fieldErrors?.email}
+                  <Typography variant="caption" fontWeight={700} sx={{ mb: 0.3, display: 'block', color: COLORS.textPrimary }}>EMAIL ADDRESS</Typography>
+                  <TextField fullWidth placeholder="name@domain.com" sx={inputStyles} value={formData.email} error={!!fieldErrors?.email} helperText={fieldErrors?.email}
+                    autoComplete="off"
+                    name="register-email"
                     onChange={(e) => onEmailChange ? onEmailChange(e.target.value) : setFormData({...formData, email: e.target.value})}
-                    InputProps={{ startAdornment: <InputAdornment position="start"><EmailOutlined fontSize="small" /></InputAdornment> }} 
+                    InputProps={{ startAdornment: <InputAdornment position="start"><EmailOutlined sx={{ fontSize: 18, color: COLORS.textSub }} /></InputAdornment> }} 
                   />
                 </Box>
 
                 <Box>
-                  <Typography variant="caption" fontWeight={700} sx={{ mb: 0.5, display: 'block', color: COLORS.primary }}>Password</Typography>
-                  <TextField fullWidth placeholder="Create a strong password" type={showPassword ? 'text' : 'password'} sx={inputStyles} autoComplete="new-password" value={formData.password} onChange={(e) => onPasswordChange(e.target.value)}
+                  <Typography variant="caption" fontWeight={700} sx={{ mb: 0.3, display: 'block', color: COLORS.textPrimary }}>PASSWORD</Typography>
+                  <TextField fullWidth placeholder="Create password" type={showPassword ? 'text' : 'password'} sx={inputStyles} value={formData.password}
+                    autoComplete="new-password"
+                    name="register-password"
+                    onChange={(e) => onPasswordChange(e.target.value)}
                     InputProps={{ 
-                      startAdornment: <InputAdornment position="start"><LockOutlined fontSize="small" /></InputAdornment>,
-                      endAdornment: <IconButton onClick={() => setShowPassword(!showPassword)} size="small"><Visibility fontSize="small" /></IconButton>
+                      startAdornment: <InputAdornment position="start"><LockOutlined sx={{ fontSize: 18, color: COLORS.textSub }} /></InputAdornment>,
+                      endAdornment: <IconButton onClick={() => setShowPassword(!showPassword)} size="small" sx={{ color: COLORS.textSub }}><Visibility sx={{ fontSize: 16 }} /></IconButton>
                     }} 
                   />
                   {formData.password && (
-                    <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Box sx={{ flex: 1, height: 4, bgcolor: '#E2E8F0', borderRadius: 1 }}>
-                        <Box sx={{ height: '100%', width: `${passwordStrength}%`, bgcolor: passwordStrength < 70 ? '#F59E0B' : COLORS.success, borderRadius: 1 }} />
+                    <Box sx={{ mt: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ flex: 1, height: 3, bgcolor: '#E2E8F0', borderRadius: 1 }}>
+                        <Box sx={{ height: '100%', width: `${passwordStrength}%`, bgcolor: passwordStrength < 70 ? '#F59E0B' : COLORS.success, transition: 'width 0.3s' }} />
                       </Box>
                     </Box>
                   )}
                 </Box>
 
                 <Box>
-                  <Typography variant="caption" fontWeight={700} sx={{ mb: 0.5, display: 'block', color: COLORS.primary }}>Confirm Password</Typography>
-                  <TextField fullWidth placeholder="Re-enter your password" type={showPassword ? 'text' : 'password'} sx={inputStyles} autoComplete="new-password" value={formData.confirmPassword} onChange={(e) => onConfirmPasswordChange ? onConfirmPasswordChange(e.target.value) : setFormData({...formData, confirmPassword: e.target.value})}
-                    InputProps={{ 
-                      startAdornment: <InputAdornment position="start"><LockOutlined fontSize="small" /></InputAdornment>
-                    }}
-                    error={!!fieldErrors?.confirmPassword}
-                    helperText={fieldErrors?.confirmPassword}
-                  />
-                </Box>
-
-                <Box>
-                  <Typography variant="caption" fontWeight={700} sx={{ mb: 0.5, display: 'block', color: COLORS.primary }}>Phone Number</Typography>
-                  <TextField fullWidth placeholder="+1 (555) 000-0000" sx={inputStyles} autoComplete="off" value={formData.phoneNumber} onChange={(e) => onPhoneChange ? onPhoneChange(e.target.value) : setFormData({...formData, phoneNumber: e.target.value})} 
-                    InputProps={{ startAdornment: <InputAdornment position="start"><PhoneOutlined fontSize="small" /></InputAdornment> }} 
+                  <Typography variant="caption" fontWeight={700} sx={{ mb: 0.3, display: 'block', color: COLORS.textPrimary }}>CONFIRM PASSWORD</Typography>
+                  <TextField fullWidth placeholder="Repeat password" type={showPassword ? 'text' : 'password'} sx={inputStyles} value={formData.confirmPassword}
+                    autoComplete="new-password"
+                    name="register-confirm-password"
+                    onChange={(e) => onConfirmPasswordChange ? onConfirmPasswordChange(e.target.value) : setFormData({...formData, confirmPassword: e.target.value})}
+                    error={!!fieldErrors?.confirmPassword} helperText={fieldErrors?.confirmPassword}
+                    InputProps={{ startAdornment: <InputAdornment position="start"><LockOutlined sx={{ fontSize: 18, color: COLORS.textSub }} /></InputAdornment> }}
                   />
                 </Box>
 
                 <FormControlLabel
-                  control={<Checkbox size="small" checked={formData.gdprConsent} onChange={(e) => setFormData({...formData, gdprConsent: e.target.checked})} />}
-                  label={<Typography variant="caption" color={COLORS.textSub}>I agree to the <Link href="#" underline="none" fontWeight={600}>Terms</Link> and <Link href="#" underline="none" fontWeight={600}>Privacy Policy</Link></Typography>}
+                  sx={{ mt: -0.5, '& .MuiCheckbox-root': { color: COLORS.border } }}
+                  control={<Checkbox size="small" checked={formData.gdprConsent} onChange={(e) => setFormData({...formData, gdprConsent: e.target.checked})} sx={{ '&.Mui-checked': { color: COLORS.accent } }} />}
+                  label={<Typography variant="caption" color={COLORS.textSub}>I agree to the <Link href="#" underline="none" fontWeight={700} color={COLORS.accent}>Terms & Privacy</Link></Typography>}
                 />
 
                 <Button 
                   type="submit" fullWidth variant="contained" disabled={!!disableSubmit}
                   sx={{ 
-                    bgcolor: COLORS.primary, py: 1.5, borderRadius: '12px', fontWeight: 700, textTransform: 'none',
-                    '&:hover': { bgcolor: '#1E293B', transform: 'translateY(-1px)' }, transition: 'all 0.2s'
+                    bgcolor: COLORS.accent, py: 1.2, borderRadius: '10px', fontWeight: 700, textTransform: 'none', fontSize: '0.85rem',
+                    color: '#FFFFFF',
+                    boxShadow: `0 4px 20px rgba(59, 130, 246, 0.4)`,
+                    '&:hover': { bgcolor: '#2563EB', boxShadow: `0 6px 24px rgba(59, 130, 246, 0.5)` },
+                    '&.Mui-disabled': { 
+                      bgcolor: 'rgba(255, 255, 255, 0.1)',
+                      color: 'rgba(255, 255, 255, 0.4)',
+                      boxShadow: 'none'
+                    }
                   }}>
-                  {loading ? <CircularProgress size={24} color="inherit" /> : 'Create Account'}
+                  {loading ? <CircularProgress size={18} color="inherit" /> : 'Create Account'}
                 </Button>
 
-                <Typography variant="body2" textAlign="center" sx={{ color: COLORS.textSub, mt: 2 }}>
+                <Typography variant="caption" textAlign="center" sx={{ color: COLORS.textSub }}>
                   Already have an account? <Link href="/login" sx={{ color: COLORS.accent, fontWeight: 700, textDecoration: 'none' }}>Sign in</Link>
                 </Typography>
               </Stack>
             </form>
-          </Box>
+          </Container>
         </Grid>
       </Grid>
     </Box>

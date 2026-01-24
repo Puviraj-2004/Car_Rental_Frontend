@@ -148,7 +148,8 @@ export const CarsContainer = () => {
       alert={alert}
       onAlertClose={() => setAlert({ ...alert, open: false })}
       topBarRef={topBarRef}
-      validationError={showValidation ? validationError : ''}
+      validationError={validationError}
+      showValidation={showValidation}
     />
   );
 };
