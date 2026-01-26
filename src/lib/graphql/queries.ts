@@ -107,6 +107,8 @@ export const GET_ALL_BOOKINGS_QUERY = gql`
         fullName
         email
         phoneNumber
+        dateOfBirth
+        fullAddress
       }
       payment {
         id
@@ -120,6 +122,9 @@ export const GET_ALL_BOOKINGS_QUERY = gql`
         id
         plateNumber
         status
+        transmission
+        fuelType
+        seats
         brand { name }
         model { name }
         images {
@@ -318,12 +323,15 @@ export const GET_BOOKING_QUERY = gql`
       endDate
       pickupTime
       returnTime
+      createdAt
 
       user {
         id
         fullName
         email
         phoneNumber
+        dateOfBirth
+        fullAddress
       }
 
       startOdometer
@@ -349,6 +357,8 @@ export const GET_BOOKING_QUERY = gql`
         plateNumber
         fuelType
         transmission
+        seats
+        status
         requiredLicense
         dailyKmLimit
         extraKmCharge
@@ -360,8 +370,11 @@ export const GET_BOOKING_QUERY = gql`
         }
       }
       payment {
+        id
         status
         amount
+        stripeId
+        createdAt
       }
       documentVerification {
         id

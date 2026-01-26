@@ -1,20 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import dynamic from 'next/dynamic';
 import { useAdminBookings } from '@/hooks/useAdminBookings';
 import { AdminBookingsView } from './AdminBookingsView';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { useRouter } from 'next/navigation';
-
-// Dynamically import the heavy modal component
-const AdminBookingDetailsModal = dynamic(
-  () => import('./AdminBookingDetailsModal').then(mod => mod.AdminBookingDetailsModal),
-  { 
-    loading: () => <CircularProgress />,
-    ssr: false 
-  }
-);
 
 type ViewFilter = {
   label?: string;
@@ -28,46 +18,41 @@ export const AdminBookingsContainer = ({ viewFilter }: { viewFilter?: ViewFilter
     bookings, loading, error, 
     searchQuery, setSearchQuery, 
     statusFilter, setStatusFilter,
-    actions 
   } = useAdminBookings({ bookingType: viewFilter?.bookingType, walkInOnly: viewFilter?.walkInOnly });
 
-  const [selectedBooking, setSelectedBooking] = useState<any>(null);
-  const [modalOpen, setModalOpen] = useState(false);
-
   const handleRowClick = (booking: any) => {
-    setSelectedBooking(booking);
-    setModalOpen(true);
+    // Navigate to booking details page instead of opening modal
+    router.push(`/admin/bookings/${booking.id}`);
   };
 
   const handleCreateClick = () => {
-    // Navigate to a dedicated admin creation page or open a create modal
-    // For now, let's assume route:
-    router.push('/admin/bookings/create'); 
+    // Route to car selection page with correct params
+    const params = new URLSearchParams();
+    if (viewFilter?.bookingType === 'REPLACEMENT') {
+      params.set('bookingType', 'REPLACEMENT');
+      params.set('totalPrice', '0');
+    } else {
+      params.set('bookingType', 'RENTAL');
+    }
+    if (viewFilter?.walkInOnly) {
+      params.set('isWalkIn', 'true');
+    }
+    router.push(`/admin/bookings/cars?${params.toString()}`);
   };
 
   if (loading && !bookings.length) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>;
   if (error) return <Typography color="error">Error loading records: {error.message}</Typography>;
 
   return (
-    <>
-      <AdminBookingsView 
-        bookings={bookings} 
-        onRowClick={handleRowClick}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        statusFilter={statusFilter}
-        setStatusFilter={setStatusFilter}
-        onCreateClick={handleCreateClick}
-        viewLabel={viewFilter?.label}
-      />
-      {modalOpen && (
-        <AdminBookingDetailsModal 
-          open={modalOpen} 
-          onClose={() => setModalOpen(false)} 
-          booking={selectedBooking} 
-          actions={actions}
-        />
-      )}
-    </>
+    <AdminBookingsView 
+      bookings={bookings} 
+      onRowClick={handleRowClick}
+      searchQuery={searchQuery}
+      setSearchQuery={setSearchQuery}
+      statusFilter={statusFilter}
+      setStatusFilter={setStatusFilter}
+      onCreateClick={handleCreateClick}
+      viewLabel={viewFilter?.label}
+    />
   );
 };

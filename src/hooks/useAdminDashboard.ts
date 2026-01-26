@@ -25,9 +25,9 @@ export const useAdminDashboard = () => {
     totalUsers: data?.users?.length || 0,
     totalCars: data?.cars?.length || 0,
     totalBookings: data?.bookings?.length || 0,
-    // Calculate total revenue from non-cancelled bookings
+    // Calculate total revenue from non-cancelled/rejected/expired bookings
     totalRevenue: data?.bookings?.reduce((acc: number, curr: any) => 
-      curr.status !== 'CANCELLED' ? acc + (curr.totalPrice || 0) : acc, 0) || 0,
+      !['CANCELLED', 'REJECTED', 'EXPIRED'].includes(curr.status) ? acc + (curr.totalPrice || 0) : acc, 0) || 0,
     recentBookings: data?.bookings?.slice(0, 5) || [],
     availableCars: data?.cars?.filter((c: any) => c.status === 'AVAILABLE').length || 0
   };

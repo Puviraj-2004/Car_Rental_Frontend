@@ -99,7 +99,8 @@ export const useAdminBookings = (filterOptions?: BookingFilterOptions) => {
       completeTrip, 
       verifyDoc, 
       finishMaintenance,
-      cancelBooking: handleCancelBooking // Expose the wrapper function
+      cancelBooking: handleCancelBooking, // Expose the wrapper function
+      refreshBooking: refetch // Add refetch for modal refresh
     }
   };
 };

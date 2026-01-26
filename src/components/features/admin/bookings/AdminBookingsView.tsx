@@ -18,10 +18,12 @@ import { formatDateForDisplay } from '@/lib/dateUtils';
 const statusStyles: any = {
   PENDING: { bg: '#FFF7ED', color: '#C2410C', label: 'Action Required' },
   VERIFIED: { bg: '#F0F9FF', color: '#0369A1', label: 'Identity Verified / Pay Now' },
-  CONFIRMED: { bg: '#F0FDF4', color: '#15803D', label: 'Ready to Pay' },
+  CONFIRMED: { bg: '#F0FDF4', color: '#15803D', label: 'Confirmed' },
   ONGOING: { bg: '#F5F3FF', color: '#6D28D9', label: 'In Trip' },
-  COMPLETED: { bg: '#F8FAFC', color: '#475569', label: 'Returned' },
+  COMPLETED: { bg: '#F8FAFC', color: '#475569', label: 'Completed' },
   CANCELLED: { bg: '#FEF2F2', color: '#991B1B', label: 'Cancelled' },
+  REJECTED: { bg: '#FEE2E2', color: '#DC2626', label: 'Rejected' },
+  EXPIRED: { bg: '#F1F5F9', color: '#64748B', label: 'Expired' },
 };
 
 export const AdminBookingsView = ({ 
@@ -38,17 +40,18 @@ export const AdminBookingsView = ({
             {viewLabel ? `${viewLabel} · ` : ''}Managing {bookings.length} visible reservations
           </Typography>
         </Box>
-        
-        <Stack direction="row" spacing={2}>
-          <Button 
-            variant="contained" 
-            startIcon={<AddIcon />} 
+        {/* Show New Booking button only for Onsite or Replacement views */}
+        {(viewLabel === 'Onsite walk-ins' || viewLabel === 'Replacement bookings') && (
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
             onClick={onCreateClick}
-            sx={{ bgcolor: '#0F172A', fontWeight: 700 }}
+            sx={{ fontWeight: 700, borderRadius: 2 }}
           >
             New Booking
           </Button>
-        </Stack>
+        )}
       </Stack>
 
       {/* Filters Toolbar */}
@@ -72,10 +75,12 @@ export const AdminBookingsView = ({
             >
               <MenuItem value="ALL">All Statuses</MenuItem>
               <MenuItem value="PENDING">Pending Verification</MenuItem>
-              <MenuItem value="CONFIRMED">Confirmed (Ready)</MenuItem>
+              <MenuItem value="CONFIRMED">Confirmed</MenuItem>
               <MenuItem value="ONGOING">Ongoing Trip</MenuItem>
               <MenuItem value="COMPLETED">Completed</MenuItem>
               <MenuItem value="CANCELLED">Cancelled</MenuItem>
+              <MenuItem value="REJECTED">Rejected</MenuItem>
+              <MenuItem value="EXPIRED">Expired</MenuItem>
             </Select>
           </FormControl>
         </Stack>
@@ -92,7 +97,6 @@ export const AdminBookingsView = ({
               <TableCell sx={{ fontWeight: 800, color: '#64748B' }}>PERIOD</TableCell>
               <TableCell sx={{ fontWeight: 800, color: '#64748B' }}>FINANCIALS</TableCell>
               <TableCell sx={{ fontWeight: 800, color: '#64748B' }}>STATUS</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 800, color: '#64748B' }}>ACTION</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -140,7 +144,6 @@ export const AdminBookingsView = ({
                       )}
                     </TableCell>
                     <TableCell><Chip label={style.label || b.status} size="small" sx={{ fontWeight: 800, bgcolor: style.bg, color: style.color }} /></TableCell>
-                    <TableCell align="right"><IconButton size="small"><ViewIcon fontSize="small" /></IconButton></TableCell>
                   </TableRow>
                 );
               })

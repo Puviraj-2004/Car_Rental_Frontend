@@ -103,7 +103,7 @@ const CarImage = ({ src, alt, size = 'medium' }: { src?: string; alt: string; si
 export const AdminCarsView = ({
   cars, brands, models, enums, filters, setFilters, resetFilters,
   view, setView, onDeleteClick, onEditClick, onAddClick,
-  deleteDialogOpen, setDeleteDialogOpen, confirmDelete, loading
+  deleteDialogOpen, setDeleteDialogOpen, confirmDelete, loading, onCarSelect
 }: any) => {
 
   const formatEnum = (text: string) => {
@@ -256,7 +256,7 @@ export const AdminCarsView = ({
             <Grid item xs={12} sm={6} lg={4} key={car.id}>
               <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid #E2E8F0', overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column', transition: '0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 12px 24px -10px rgba(0,0,0,0.1)' } }}>
                 <Box sx={{ p: 1.5, pb: 0 }}>
-                   {/* Car Image Box */}
+                  {/* Car Image Box */}
                   <CarImage src={car.images?.[0]?.url} alt={`${car.brand.name} ${car.model.name}`} size="medium" />
                   <Chip 
                     label={car.status} 
@@ -282,6 +282,11 @@ export const AdminCarsView = ({
                     <Stack direction="row" spacing={1}>
                       <IconButton size="small" onClick={() => onEditClick(car.id)} sx={{ border: '1px solid #E2E8F0', borderRadius: 2 }}><EditIcon fontSize="small" /></IconButton>
                       <IconButton size="small" color="error" onClick={() => onDeleteClick(car)} sx={{ border: '1px solid', borderColor: alpha('#EF4444', 0.2), bgcolor: alpha('#EF4444', 0.02), borderRadius: 2 }}><DeleteIcon fontSize="small" /></IconButton>
+                      {onCarSelect && (
+                        <Button size="small" variant="outlined" sx={{ ml: 1, fontWeight: 700 }} onClick={() => onCarSelect(car.id)}>
+                          Select
+                        </Button>
+                      )}
                     </Stack>
                   </Stack>
                 </CardContent>

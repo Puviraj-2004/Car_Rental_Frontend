@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { addHours, isBefore, isSameDay, isToday } from 'date-fns';
 import { useCars } from '@/hooks/graphql/useCars';
@@ -9,8 +9,13 @@ import { CarsView } from './CarsView';
 
 export const CarsContainer = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { status } = useSession();
   const topBarRef = useRef<HTMLDivElement>(null);
+
+  // Read admin/user booking params from URL
+  const bookingType = searchParams.get('bookingType') || undefined;
+  const isWalkIn = searchParams.get('isWalkIn') || undefined;
 
   const [mainFilter, setMainFilter] = useState({ startDate: '', startTime: '', endDate: '', endTime: '' });
   const [touched, setTouched] = useState({ startDate: false, startTime: false, endDate: false, endTime: false });
@@ -93,13 +98,16 @@ export const CarsContainer = () => {
     const startDateTime = `${mainFilter.startDate}T${mainFilter.startTime}`;
     const endDateTime = `${mainFilter.endDate}T${mainFilter.endTime}`;
 
-    const params = new URLSearchParams({
+
+    const params: Record<string, string> = {
       carId: car.id,
       start: startDateTime,
       end: endDateTime
-    });
-
-    const targetUrl = `/booking?${params.toString()}`;
+    };
+    if (bookingType) params.bookingType = bookingType;
+    if (isWalkIn) params.isWalkIn = isWalkIn;
+    const urlParams = new URLSearchParams(params).toString();
+    const targetUrl = `/booking?${urlParams}`;
 
     // 3. Navigate (Handle Auth Redirect if needed)
     if (status !== 'authenticated') {

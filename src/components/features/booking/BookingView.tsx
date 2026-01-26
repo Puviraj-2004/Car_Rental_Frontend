@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import Image from 'next/image';
 import {
   Box, Container, Typography, Paper, Grid, Button, TextField,
@@ -10,9 +10,12 @@ import {
 import {
   Settings, LocalGasStation, ArrowBack, Edit, 
   EventSeat, ContentCopy, CalendarMonth, LocationOn, Shield, 
-  Close, CheckCircle
+  Close, CheckCircle, ChevronLeft as ChevronLeftIcon, ChevronRight as ChevronRightIcon
 } from '@mui/icons-material';
 import QRCode from 'react-qr-code';
+
+// Generate 30-minute time slots
+const TIME_SLOTS = Array.from({ length: 48 }, (_, i) => `${Math.floor(i / 2).toString().padStart(2, '0')}:${i % 2 ? '30' : '00'}`);
 
 export const BookingView = ({
   router, car, startDate, setStartDate, startTime, setStartTime, 
@@ -23,6 +26,110 @@ export const BookingView = ({
   validationError, emailVerificationPopup, confirmedBookingData, verificationTimer, copySuccess, handleCopyLink, onConfirmAction,
   isEditMode, isAdmin, bookingType, setBookingType, isWalkIn, setIsWalkIn, guestName, setGuestName, guestPhone, setGuestPhone, guestEmail, setGuestEmail // Received from container
  }: any) => {
+
+  // Document upload and guest info logic
+  const requireDocumentUpload = isWalkIn && bookingType !== 'REPLACEMENT';
+  const showGuestInfo = isWalkIn;
+  const skipDocumentUpload = bookingType === 'REPLACEMENT';
+
+  // Calendar modal state
+  const [dateTimeModalOpen, setDateTimeModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'pickup' | 'return'>('pickup');
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
+
+  // Generate calendar days for month view
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    
+    const days: (number | null)[] = [];
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(null);
+    }
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(i);
+    }
+    return days;
+  };
+
+  const openDateTimeModal = (mode: 'pickup' | 'return') => {
+    setModalMode(mode);
+    setDateTimeModalOpen(true);
+  };
+
+  const handleDateSelect = (day: number | null) => {
+    if (!day) return;
+    const year = calendarMonth.getFullYear();
+    const month = String(calendarMonth.getMonth() + 1).padStart(2, '0');
+    const date = String(day).padStart(2, '0');
+    const dateString = `${year}-${month}-${date}`;
+    
+    if (modalMode === 'pickup') {
+      setStartDate(dateString);
+      // Store selected date for time calculation
+      selectedPickupDateRef.current = dateString;
+    } else {
+      setEndDate(dateString);
+    }
+  };
+
+  // Ref to track the selected pickup date for time calculation
+  const selectedPickupDateRef = React.useRef<string>(startDate);
+  
+  // Keep ref in sync with state
+  React.useEffect(() => {
+    selectedPickupDateRef.current = startDate;
+  }, [startDate]);
+
+  const handleTimeSelect = (time: string) => {
+    if (modalMode === 'pickup') {
+      setStartTime(time);
+      
+      // Auto-calculate return date/time (+2 hours from pickup)
+      // Use ref to get the most current pickup date (handles same-render date selection)
+      const currentPickupDate = selectedPickupDateRef.current;
+      if (currentPickupDate) {
+        const pickupDateTime = new Date(`${currentPickupDate}T${time}:00`);
+        const returnDateTime = new Date(pickupDateTime.getTime() + 2 * 60 * 60 * 1000);
+        const returnDateStr = `${returnDateTime.getFullYear()}-${String(returnDateTime.getMonth() + 1).padStart(2, '0')}-${String(returnDateTime.getDate()).padStart(2, '0')}`;
+        const returnTimeStr = `${String(returnDateTime.getHours()).padStart(2, '0')}:${String(returnDateTime.getMinutes()).padStart(2, '0')}`;
+        setEndDate(returnDateStr);
+        setEndTime(returnTimeStr);
+      }
+    } else {
+      setEndTime(time);
+    }
+    // Auto close after selection
+    setTimeout(() => setDateTimeModalOpen(false), 300);
+  };
+
+  const getSelectedDate = () => {
+    return modalMode === 'pickup' ? startDate : endDate;
+  };
+
+  const getSelectedTime = () => {
+    return modalMode === 'pickup' ? startTime : endTime;
+  };
+
+  const calendarDays = getDaysInMonth(calendarMonth);
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const today = new Date();
+  const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  
+  // Calculate minimum return date based on pickup + 2 hours (may be next day if pickup is late)
+  const getMinReturnDate = () => {
+    if (!startDate || !startTime) return startDate || todayString;
+    const pickupDateTime = new Date(`${startDate}T${startTime}:00`);
+    const minReturnDateTime = new Date(pickupDateTime.getTime() + 2 * 60 * 60 * 1000);
+    return `${minReturnDateTime.getFullYear()}-${String(minReturnDateTime.getMonth() + 1).padStart(2, '0')}-${String(minReturnDateTime.getDate()).padStart(2, '0')}`;
+  };
+  
+  const minDate = modalMode === 'pickup' ? todayString : getMinReturnDate();
+  const minPickupDateTime = new Date(Date.now() + 60 * 60 * 1000);
 
   // Logic based on isEditMode prop
   const backButtonRoute = isEditMode ? '/bookingRecords' : '/cars';
@@ -64,21 +171,45 @@ export const BookingView = ({
                 <Grid container spacing={4}>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="caption" fontWeight={700} color="#64748B" mb={1} display="block">PICK-UP</Typography>
-                    <Stack direction="row" spacing={1}>
-                      <TextField type="date" fullWidth value={startDate} onChange={(e) => setStartDate(e.target.value)} size="small" inputProps={{ min: getMinPickupDate() }} />
-                      <TextField select value={startTime} onChange={(e) => setStartTime(e.target.value)} size="small" sx={{ minWidth: 100 }}>
-                        {generateTimeOptions().map((t: string) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
-                      </TextField>
-                    </Stack>
+                    <Button
+                      fullWidth
+                      onClick={() => openDateTimeModal('pickup')}
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        border: '1px solid #E2E8F0',
+                        bgcolor: '#F8FAFC',
+                        color: '#0F172A',
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        justifyContent: 'flex-start',
+                        '&:hover': { bgcolor: '#F1F5F9', borderColor: '#7C3AED' }
+                      }}
+                    >
+                      <CalendarMonth sx={{ mr: 1, color: '#7C3AED' }} />
+                      {startDate && startTime ? `${startDate} ${startTime}` : 'Select Date & Time'}
+                    </Button>
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="caption" fontWeight={700} color="#64748B" mb={1} display="block">DROP-OFF</Typography>
-                    <Stack direction="row" spacing={1}>
-                      <TextField type="date" fullWidth value={endDate} onChange={(e) => setEndDate(e.target.value)} size="small" inputProps={{ min: startDate }} />
-                      <TextField select value={endTime} onChange={(e) => setEndTime(e.target.value)} size="small" sx={{ minWidth: 100 }}>
-                         {generateTimeOptions().map((t: string) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
-                      </TextField>
-                    </Stack>
+                    <Button
+                      fullWidth
+                      onClick={() => openDateTimeModal('return')}
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        border: '1px solid #E2E8F0',
+                        bgcolor: '#F8FAFC',
+                        color: '#0F172A',
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        justifyContent: 'flex-start',
+                        '&:hover': { bgcolor: '#F1F5F9', borderColor: '#7C3AED' }
+                      }}
+                    >
+                      <CalendarMonth sx={{ mr: 1, color: '#7C3AED' }} />
+                      {endDate && endTime ? `${endDate} ${endTime}` : 'Select Date & Time'}
+                    </Button>
                   </Grid>
                 </Grid>
                 {validationError && (
@@ -168,6 +299,28 @@ export const BookingView = ({
                        </Stack>
                      )}
                    </Stack>
+                   {/* Document Upload/Verification Policy */}
+                   {skipDocumentUpload ? (
+                     <Alert severity="info" sx={{ mt: 2 }}>
+                       <b>Courtesy bookings</b> (for car repair/service) do <b>not</b> require document upload or verification.
+                     </Alert>
+                   ) : (
+                     <Alert severity="info" sx={{ mt: 2 }}>
+                       <b>Onsite/walk-in bookings</b> require license/ID document upload and verification. This is mandatory for legal and audit reasons.
+                     </Alert>
+                   )}
+                   {/* Document upload field (only for non-courtesy bookings) */}
+                   {requireDocumentUpload && (
+                     <Box sx={{ mt: 2 }}>
+                       <TextField
+                         type="file"
+                         label="Upload License/ID Document"
+                         inputProps={{ accept: 'image/*,application/pdf' }}
+                         required
+                         fullWidth
+                       />
+                     </Box>
+                   )}
                  </Box>
                )}
 
@@ -257,6 +410,177 @@ export const BookingView = ({
           </Grid>
         </Grid>
       </Dialog>
+
+      {/* DATE/TIME PICKER MODAL */}
+      <Dialog
+        open={dateTimeModalOpen}
+        onClose={() => setDateTimeModalOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: '24px', bgcolor: '#1E293B', overflow: 'hidden' }
+        }}
+      >
+        <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#1E293B' }}>
+          {/* Header */}
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+            <Typography variant="h6" fontWeight={900} color="#FFFFFF">
+              {modalMode === 'pickup' ? 'Select Pickup' : 'Select Return'} Date & Time
+            </Typography>
+            <IconButton onClick={() => setDateTimeModalOpen(false)} sx={{ color: '#FFFFFF' }}>
+              <Close />
+            </IconButton>
+          </Stack>
+
+          <Grid container spacing={3}>
+            {/* Calendar Section */}
+            <Grid item xs={12} md={6}>
+              <Box sx={{ bgcolor: 'rgba(124, 58, 237, 0.05)', p: 3, borderRadius: '16px', border: '1px solid rgba(124, 58, 237, 0.2)' }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                  <Typography fontWeight={700} color="#FFFFFF">
+                    {monthNames[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}
+                  </Typography>
+                  <Stack direction="row" spacing={1}>
+                    <IconButton 
+                      size="small" 
+                      onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1))}
+                      sx={{ color: '#7C3AED' }}
+                    >
+                      <ChevronLeftIcon />
+                    </IconButton>
+                    <IconButton 
+                      size="small" 
+                      onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1))}
+                      sx={{ color: '#7C3AED' }}
+                    >
+                      <ChevronRightIcon />
+                    </IconButton>
+                  </Stack>
+                </Stack>
+
+                {/* Day Headers */}
+                <Grid container sx={{ mb: 1 }}>
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                    <Grid item xs={12 / 7} key={day} sx={{ textAlign: 'center' }}>
+                      <Typography variant="caption" fontWeight={700} color="rgba(255, 255, 255, 0.5)">{day}</Typography>
+                    </Grid>
+                  ))}
+                </Grid>
+
+                {/* Calendar Days */}
+                <Grid container spacing={0.5}>
+                  {calendarDays.map((day, idx) => {
+                    const isDisabled = !day || new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day) < new Date(minDate.split('-').map(Number)[0], minDate.split('-').map(Number)[1] - 1, minDate.split('-').map(Number)[2]);
+                    const dateStr = day ? `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : '';
+                    const isSelected = day && getSelectedDate() === dateStr;
+
+                    return (
+                      <Grid item xs={12 / 7} key={idx}>
+                        {day ? (
+                          <Button
+                            onClick={() => handleDateSelect(day)}
+                            disabled={isDisabled}
+                            fullWidth
+                            sx={{
+                              aspectRatio: '1',
+                              p: 0,
+                              borderRadius: '10px',
+                              bgcolor: isSelected ? '#7C3AED' : 'rgba(124, 58, 237, 0.05)',
+                              color: isSelected ? '#FFFFFF' : '#FFFFFF',
+                              fontWeight: isSelected ? 700 : 500,
+                              border: isSelected ? '2px solid #7C3AED' : 'none',
+                              opacity: isDisabled ? 0.3 : 1,
+                              cursor: isDisabled ? 'not-allowed' : 'pointer',
+                              '&:hover': !isDisabled ? { bgcolor: isSelected ? '#7C3AED' : 'rgba(124, 58, 237, 0.15)' } : {}
+                            }}
+                          >
+                            {day}
+                          </Button>
+                        ) : (
+                          <Box />
+                        )}
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              </Box>
+            </Grid>
+
+            {/* Time Slots Section */}
+            <Grid item xs={12} md={6}>
+              <Box sx={{ bgcolor: 'rgba(124, 58, 237, 0.05)', p: 3, borderRadius: '16px', border: '1px solid rgba(124, 58, 237, 0.2)', maxHeight: '400px', overflowY: 'auto' }}>
+                <Typography fontWeight={700} color="#FFFFFF" sx={{ mb: 2 }}>Select Time</Typography>
+                <Grid container spacing={1}>
+                  {TIME_SLOTS.filter((time: string) => {
+                    const selectedDateStr = getSelectedDate();
+                    if (!selectedDateStr) return true; // Show all if no date selected
+                    const isPickupToday = modalMode === 'pickup' && selectedDateStr === todayString;
+                    const slotDate = new Date(`${selectedDateStr}T${time}:00`);
+                    
+                    // Filter out unavailable pickup time slots (must be 1h from now)
+                    if (isPickupToday && slotDate < minPickupDateTime) return false;
+                    
+                    // Filter out unavailable return time slots
+                    if (modalMode === 'return' && startDate && startTime) {
+                      const pickupDateTime = new Date(`${startDate}T${startTime}:00`);
+                      const minReturnDateTime = new Date(pickupDateTime.getTime() + 2 * 60 * 60 * 1000);
+                      const minReturnDateStr = `${minReturnDateTime.getFullYear()}-${String(minReturnDateTime.getMonth() + 1).padStart(2, '0')}-${String(minReturnDateTime.getDate()).padStart(2, '0')}`;
+                      
+                      // If selected return date is the minimum return date, filter times before minimum return time
+                      if (selectedDateStr === minReturnDateStr && slotDate < minReturnDateTime) return false;
+                    }
+                    return true;
+                  }).map((time: string) => {
+                    const isSelected = getSelectedTime() === time;
+                    return (
+                      <Grid item xs={6} key={time}>
+                        <Button
+                          onClick={() => handleTimeSelect(time)}
+                          fullWidth
+                          sx={{
+                            p: 1.5,
+                            borderRadius: '10px',
+                            bgcolor: isSelected ? '#7C3AED' : 'rgba(124, 58, 237, 0.05)',
+                            color: '#FFFFFF',
+                            fontWeight: isSelected ? 700 : 500,
+                            border: isSelected ? '2px solid #7C3AED' : '1px solid rgba(124, 58, 237, 0.2)',
+                            textTransform: 'none',
+                            '&:hover': { bgcolor: isSelected ? '#7C3AED' : 'rgba(124, 58, 237, 0.15)' }
+                          }}
+                        >
+                          {time}
+                        </Button>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              </Box>
+            </Grid>
+          </Grid>
+
+          {/* Confirm Button */}
+          <Box sx={{ mt: 3, textAlign: 'center' }}>
+            <Button
+              onClick={() => setDateTimeModalOpen(false)}
+              variant="contained"
+              fullWidth
+              sx={{
+                bgcolor: '#7C3AED',
+                color: '#FFFFFF',
+                fontWeight: 700,
+                py: 1.5,
+                borderRadius: '12px',
+                textTransform: 'none',
+                boxShadow: '0 4px 20px rgba(124, 58, 237, 0.4)',
+                '&:hover': { bgcolor: '#6D28D9' }
+              }}
+            >
+              Confirm
+            </Button>
+          </Box>
+        </Box>
+      </Dialog>
+
       <Snackbar open={copySuccess} autoHideDuration={2000} onClose={() => {}} message="Link copied!" />
     </Box>
   );

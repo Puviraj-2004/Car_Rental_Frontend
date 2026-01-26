@@ -61,11 +61,13 @@ export function formatDateForDisplay(date: Date | string | null): string {
     const dateObj = new Date(date);
     if (isNaN(dateObj.getTime())) return 'N/A';
     
-    return dateObj.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
+    // Use UTC methods to avoid timezone conversion issues
+    const day = dateObj.getUTCDate();
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = monthNames[dateObj.getUTCMonth()];
+    const year = dateObj.getUTCFullYear();
+    
+    return `${day} ${month} ${year}`;
   } catch (error) {
     return 'N/A';
   }

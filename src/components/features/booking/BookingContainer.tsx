@@ -16,7 +16,11 @@ export const BookingContainer = () => {
 
   const carId = searchParams.get('carId');
   const bookingId = searchParams.get('bookingId') || null;
-  
+  // Detect bookingType and isWalkIn from route params
+  const bookingTypeParam = searchParams.get('bookingType');
+  const isWalkInParam = searchParams.get('isWalkIn') === 'true';
+  const totalPriceParam = searchParams.get('totalPrice');
+
   // Logic: If bookingId exists, we are in Edit Mode
   const isEditMode = !!bookingId;
 
@@ -34,11 +38,12 @@ export const BookingContainer = () => {
   const [verificationTimer, setVerificationTimer] = useState<string>('60:00');
   const [copySuccess, setCopySuccess] = useState(false);
   const [validationError, setValidationError] = useState('');
-  const [isWalkIn, setIsWalkIn] = useState(false);
+  // Auto-fill admin logic
+  const [isWalkIn, setIsWalkIn] = useState(isWalkInParam);
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
-  const [bookingType, setBookingType] = useState<'RENTAL' | 'REPLACEMENT'>('RENTAL');
+  const [bookingType, setBookingType] = useState(bookingTypeParam === 'REPLACEMENT' ? 'REPLACEMENT' : 'RENTAL');
 
   // Sync URL Params
   useEffect(() => {
@@ -86,8 +91,8 @@ export const BookingContainer = () => {
     setValidationError(error);
   }, [startDate, startTime, endDate, endTime]);
 
-  const startDateTime = `${startDate}T${startTime}:00`;
-  const endDateTime = `${endDate}T${endTime}:00`;
+  const startDateTime = `${startDate}T${startTime}:00.000Z`;
+  const endDateTime = `${endDate}T${endTime}:00.000Z`;
   const hasDates = !!(startDate && startTime && endDate && endTime);
 
   // Logic: First check URL carId, if not then check bookingData (when it arrives)
@@ -204,7 +209,7 @@ export const BookingContainer = () => {
         router.push('/bookingRecords');
       } else {
         // CREATE NEW BOOKING
-        const { data: bRes } = await createBooking({ variables: { input: { carId: targetCarId, startDate: `${startDate}T00:00:00.000Z`, endDate: `${endDate}T00:00:00.000Z`, pickupTime: startTime, returnTime: endTime, basePrice: priceDetails?.basePrice, taxAmount: priceDetails?.taxAmount, totalPrice: priceDetails?.totalPrice, depositAmount: priceDetails?.deposit, bookingType: isAdmin ? bookingType : 'RENTAL', isWalkIn: isAdmin ? isWalkIn : false, guestName: isWalkIn ? guestName : undefined, guestPhone: isWalkIn ? guestPhone : undefined, guestEmail: isWalkIn ? guestEmail : undefined } } });
+        const { data: bRes } = await createBooking({ variables: { input: { carId: targetCarId, startDate: startDateTime, endDate: endDateTime, pickupTime: startTime, returnTime: endTime, basePrice: priceDetails?.basePrice, taxAmount: priceDetails?.taxAmount, totalPrice: priceDetails?.totalPrice, depositAmount: priceDetails?.deposit, bookingType: isAdmin ? bookingType : 'RENTAL', isWalkIn: isAdmin ? isWalkIn : false, guestName: isWalkIn ? guestName : undefined, guestPhone: isWalkIn ? guestPhone : undefined, guestEmail: isWalkIn ? guestEmail : undefined } } });
         const bId = bRes.createBooking.id;
         if (isAdmin && isWalkIn) {
           // For onsite admin bookings, skip customer verification flow

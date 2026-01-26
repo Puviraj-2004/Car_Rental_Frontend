@@ -31,6 +31,8 @@ const getStatusStyles = (status: string) => {
   switch (status) {
     case 'CONFIRMED': return { bg: '#ECFDF5', color: '#047857', border: '#A7F3D0', label: 'Confirmed' };
     case 'CANCELLED': return { bg: '#FEF2F2', color: '#B91C1C', border: '#FECACA', label: 'Cancelled' };
+    case 'REJECTED': return { bg: '#FEE2E2', color: '#DC2626', border: '#FECACA', label: 'Rejected' };
+    case 'EXPIRED': return { bg: '#F1F5F9', color: '#64748B', border: '#E2E8F0', label: 'Expired' };
     case 'PENDING': return { bg: '#FFF7ED', color: '#C2410C', border: '#FED7AA', label: 'Action Required' };
     case 'VERIFIED': return { bg: '#EFF6FF', color: '#1D4ED8', border: '#BFDBFE', label: 'Identity Verified / Pay Now' };
     case 'ONGOING': return { bg: '#F5F3FF', color: '#6D28D9', border: '#DDD6FE', label: 'Active Trip' };
@@ -55,11 +57,21 @@ export const BookingRecordsView = ({
   return (
     <Box sx={{ bgcolor: '#F8FAFC', minHeight: '100vh',  pb: 10 }}>
       <Container maxWidth="xl">
-        <Box sx={{ mb: 5, px: { xs: 1, md: 0 } }}>
-          <Typography variant="h4" fontWeight={900} color="#0F172A" sx={{ fontSize: { xs: '1.75rem', md: '2.5rem' }, letterSpacing: '-0.02em' }}>
-            Booking History
-          </Typography>
-          <Typography variant="body1" color="text.secondary">Review and manage your vehicle reservations</Typography>
+        <Box sx={{ mb: 5, px: { xs: 1, md: 0 }, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' } }}>
+          <Box>
+            <Typography variant="h4" fontWeight={900} color="#0F172A" sx={{ fontSize: { xs: '1.75rem', md: '2.5rem' }, letterSpacing: '-0.02em' }}>
+              Booking History
+            </Typography>
+            <Typography variant="body1" color="text.secondary">Review and manage your vehicle reservations</Typography>
+          </Box>
+          <Button
+            variant="contained"
+            color="primary"
+            sx={{ mt: { xs: 2, md: 0 }, fontWeight: 700, borderRadius: 2 }}
+            href="/cars"
+          >
+            New Booking
+          </Button>
         </Box>
 
         {/* 💻 DESKTOP VIEW: Professional Data Table */}
@@ -209,11 +221,11 @@ export const BookingRecordsView = ({
                           {
                             (() => {
                               const status = selectedBooking?.status;
-                              const cannotCancel = status === 'COMPLETED' || status === 'CANCELLED';
+                              const cannotCancel = ['COMPLETED', 'CANCELLED', 'REJECTED', 'EXPIRED'].includes(status);
                               
                               if (cannotCancel) {
                                 return (
-                                  <Tooltip title="Cannot cancel completed or cancelled bookings">
+                                  <Tooltip title="Cannot cancel completed, cancelled, rejected or expired bookings">
                                     <span style={{ display: 'block', width: '100%' }}>
                                       <Button fullWidth variant="outlined" color="error" startIcon={<CancelIcon />} sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700 }} disabled>
                                         Cancel
@@ -351,6 +363,12 @@ export const BookingRecordsView = ({
 
               {selectedBooking.status === 'CANCELLED' && (
                 <Alert severity="error" icon={<InfoIcon />} sx={{ mt: 4, borderRadius: 3, fontWeight: 600 }}>This booking has been cancelled and the inventory released.</Alert>
+              )}
+              {selectedBooking.status === 'REJECTED' && (
+                <Alert severity="error" icon={<InfoIcon />} sx={{ mt: 4, borderRadius: 3, fontWeight: 600 }}>This booking has been rejected by admin.</Alert>
+              )}
+              {selectedBooking.status === 'EXPIRED' && (
+                <Alert severity="warning" icon={<InfoIcon />} sx={{ mt: 4, borderRadius: 3, fontWeight: 600 }}>This booking has expired as the trip was not started before the return date.</Alert>
               )}
             </DialogContent>
           </>

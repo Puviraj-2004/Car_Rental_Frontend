@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAdminCars } from '@/hooks/useAdminCars';
 import { AdminCarsView } from './AdminCarsView';
 
-export const AdminCarsContainer = () => {
+export const AdminCarsContainer = ({ onCarSelect }: { onCarSelect?: (carId: string) => void }) => {
   const router = useRouter();
   const [view, setView] = useState<'list' | 'grid'>('grid');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -54,6 +54,7 @@ export const AdminCarsContainer = () => {
       onAddClick={handleAdd}
       confirmDelete={handleConfirmDelete}
       loading={loading}
+      onCarSelect={onCarSelect}
     />
   );
 };

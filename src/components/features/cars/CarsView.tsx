@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import {
   Box, Container, Grid, Typography, Card, Button, Chip, Stack,
@@ -70,14 +70,36 @@ export const CarsView = ({
     
     if (modalMode === 'pickup') {
       onDateChange('startDate', dateString);
+      // Store selected date for time calculation
+      selectedPickupDateRef.current = dateString;
     } else {
       onDateChange('endDate', dateString);
     }
   };
 
+  // Ref to track the selected pickup date for time calculation
+  const selectedPickupDateRef = useRef<string>(mainFilter.startDate);
+  
+  // Keep ref in sync with prop
+  useEffect(() => {
+    selectedPickupDateRef.current = mainFilter.startDate;
+  }, [mainFilter.startDate]);
+
   const handleTimeSelect = (time: string) => {
     if (modalMode === 'pickup') {
       onTimeChange('startTime', time);
+      
+      // Auto-calculate return date/time (+2 hours from pickup)
+      // Use ref to get the most current pickup date (handles same-render date selection)
+      const currentPickupDate = selectedPickupDateRef.current;
+      if (currentPickupDate) {
+        const pickupDateTime = new Date(`${currentPickupDate}T${time}:00`);
+        const returnDateTime = new Date(pickupDateTime.getTime() + 2 * 60 * 60 * 1000);
+        const returnDateStr = `${returnDateTime.getFullYear()}-${String(returnDateTime.getMonth() + 1).padStart(2, '0')}-${String(returnDateTime.getDate()).padStart(2, '0')}`;
+        const returnTimeStr = `${String(returnDateTime.getHours()).padStart(2, '0')}:${String(returnDateTime.getMinutes()).padStart(2, '0')}`;
+        onDateChange('endDate', returnDateStr);
+        onTimeChange('endTime', returnTimeStr);
+      }
     } else {
       onTimeChange('endTime', time);
     }
@@ -97,7 +119,16 @@ export const CarsView = ({
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const today = new Date();
   const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  const minDate = modalMode === 'pickup' ? todayString : (mainFilter.startDate || todayString);
+  
+  // Calculate minimum return date based on pickup + 2 hours (may be next day if pickup is late)
+  const getMinReturnDate = () => {
+    if (!mainFilter.startDate || !mainFilter.startTime) return mainFilter.startDate || todayString;
+    const pickupDateTime = new Date(`${mainFilter.startDate}T${mainFilter.startTime}:00`);
+    const minReturnDateTime = new Date(pickupDateTime.getTime() + 2 * 60 * 60 * 1000);
+    return `${minReturnDateTime.getFullYear()}-${String(minReturnDateTime.getMonth() + 1).padStart(2, '0')}-${String(minReturnDateTime.getDate()).padStart(2, '0')}`;
+  };
+  
+  const minDate = modalMode === 'pickup' ? todayString : getMinReturnDate();
   const minPickupDateTime = new Date(Date.now() + 60 * 60 * 1000);
 
   const handleCheckboxChange = useCallback((key: string, value: string) => {
@@ -255,23 +286,43 @@ export const CarsView = ({
     );
   };
 
+  // Detect if admin sidebar is present by checking for a specific class or prop (simple approach: check for window.location.pathname)
+  const isAdmin = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+
   return (
-    <Box sx={{ bgcolor: '#0F172A', minHeight: '100vh', pb: 10 }}>
-      
+    <Box
+      sx={{
+        bgcolor: '#0F172A',
+        minHeight: '100vh',
+        pb: 10,
+        ml: isAdmin ? { md: '260px' } : 0,
+        maxWidth: isAdmin ? { md: 'calc(100vw - 260px)' } : '100vw',
+        transition: 'all 0.3s',
+      }}
+    >
       {/* 1. TOP SELECTION BAR - Clean Button-Based Modal UI */}
-      <Paper 
-        ref={topBarRef} 
-        elevation={0} 
-        sx={{ 
-          position: 'fixed', 
-          top: { xs: 56, md: 90 }, 
-          left: 0, 
-          right: 0, 
-          zIndex: 99, 
-          py: { xs: 2, md: 3 }, 
-          borderBottom: '1px solid rgba(59, 130, 246, 0.2)', 
-          bgcolor: '#1E293B', 
-          backdropFilter: 'blur(12px)'
+      <Paper
+        ref={topBarRef}
+        elevation={0}
+        sx={{
+          position: 'fixed',
+          top: { xs: 56, md: 90 },
+          left: isAdmin ? { xs: 0, md: '260px' } : 0,
+          right: 0,
+          zIndex: 99,
+          py: { xs: 2, md: 3 },
+          borderBottom: '1px solid rgba(59, 130, 246, 0.2)',
+          bgcolor: '#1E293B',
+          backdropFilter: 'blur(12px)',
+          maxWidth: isAdmin ? { md: 'calc(100vw - 260px)' } : '100vw',
+          marginLeft: isAdmin ? { md: 'auto' } : 0,
+          transition: 'all 0.3s',
+          // UI size adjustments
+          width: { xs: '95vw', md: 'calc(100vw - 280px)' },
+          borderRadius: { xs: '24px', md: '32px' },
+          mt: { xs: 2, md: 4 },
+          mx: 'auto',
+          boxShadow: '0 8px 32px rgba(59,130,246,0.10)',
         }}
       >
         <Container maxWidth="xl">
@@ -529,25 +580,32 @@ export const CarsView = ({
               <Box sx={{ bgcolor: 'rgba(59, 130, 246, 0.05)', p: 3, borderRadius: '16px', border: '1px solid rgba(59, 130, 246, 0.2)', maxHeight: '400px', overflowY: 'auto' }}>
                 <Typography fontWeight={700} color="#FFFFFF" sx={{ mb: 2 }}>Select Time</Typography>
                 <Grid container spacing={1}>
-                  {TIME_SLOTS.map((time: string) => {
-                    const isSelected = getSelectedTime() === time;
+                  {TIME_SLOTS.filter((time: string) => {
                     const selectedDateStr = getSelectedDate();
+                    if (!selectedDateStr) return true; // Show all if no date selected
                     const isPickupToday = modalMode === 'pickup' && selectedDateStr === todayString;
-                    const slotDate = selectedDateStr ? new Date(`${selectedDateStr}T${time}:00`) : null;
-                    const isReturnSameDay = modalMode === 'return' && selectedDateStr === mainFilter.startDate;
-                    const hasPickupTime = !!mainFilter.startTime;
-                    const minReturnDateTime = hasPickupTime ? new Date(`${mainFilter.startDate}T${mainFilter.startTime}:00`) : null;
-                    const minReturnPlus2h = minReturnDateTime ? new Date(minReturnDateTime.getTime() + 2 * 60 * 60 * 1000) : null;
-                    const isDisabled = !!(
-                      (isPickupToday && slotDate && slotDate < minPickupDateTime) ||
-                      (modalMode === 'return' && isReturnSameDay && hasPickupTime && slotDate && minReturnPlus2h && slotDate < minReturnPlus2h)
-                    );
+                    const slotDate = new Date(`${selectedDateStr}T${time}:00`);
+                    
+                    // Filter out unavailable pickup time slots (must be 1h from now)
+                    if (isPickupToday && slotDate < minPickupDateTime) return false;
+                    
+                    // Filter out unavailable return time slots
+                    if (modalMode === 'return' && mainFilter.startDate && mainFilter.startTime) {
+                      const pickupDateTime = new Date(`${mainFilter.startDate}T${mainFilter.startTime}:00`);
+                      const minReturnDateTime = new Date(pickupDateTime.getTime() + 2 * 60 * 60 * 1000);
+                      const minReturnDateStr = `${minReturnDateTime.getFullYear()}-${String(minReturnDateTime.getMonth() + 1).padStart(2, '0')}-${String(minReturnDateTime.getDate()).padStart(2, '0')}`;
+                      
+                      // If selected return date is the minimum return date, filter times before minimum return time
+                      if (selectedDateStr === minReturnDateStr && slotDate < minReturnDateTime) return false;
+                    }
+                    return true;
+                  }).map((time: string) => {
+                    const isSelected = getSelectedTime() === time;
                     return (
                       <Grid item xs={6} key={time}>
                         <Button
                           onClick={() => handleTimeSelect(time)}
                           fullWidth
-                          disabled={isDisabled}
                           sx={{
                             p: 1.5,
                             borderRadius: '10px',
@@ -556,8 +614,7 @@ export const CarsView = ({
                             fontWeight: isSelected ? 700 : 500,
                             border: isSelected ? '2px solid #3B82F6' : '1px solid rgba(59, 130, 246, 0.2)',
                             textTransform: 'none',
-                            '&:hover': { bgcolor: isSelected ? '#3B82F6' : 'rgba(59, 130, 246, 0.15)' },
-                            '&.Mui-disabled': { opacity: 0.4, cursor: 'not-allowed' }
+                            '&:hover': { bgcolor: isSelected ? '#3B82F6' : 'rgba(59, 130, 246, 0.15)' }
                           }}
                         >
                           {time}
